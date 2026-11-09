@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 168" role="img" aria-labelledby="title desc">
+  <title id="title">Twitch Chat Window</title>
+  <desc id="desc">Live Twitch chat on one screen</desc>
+  <defs>
+    <linearGradient id="panel" x2="1" y2="0">
+      <stop stop-color="#16151F"/>
+      <stop offset="1" stop-color="#252035"/>
+    </linearGradient>
+    <linearGradient id="violet" x2="1" y2="1">
+      <stop stop-color="#BC98FF"/>
+      <stop offset="1" stop-color="#884DEB"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="638" height="166" rx="22" fill="url(#panel)" stroke="#493664" stroke-width="2"/>
+  <g transform="translate(28 36) scale(1.5)">
+    <rect x="3" y="3" width="58" height="58" rx="15" fill="url(#violet)"/>
+    <path d="M21 16h22a9 9 0 0 1 9 9v12a9 9 0 0 1-9 9H28l-11 6v-7a9 9 0 0 1-5-8V25a9 9 0 0 1 9-9Z" fill="#16151F"/>
+    <path d="M21 27h22M21 35h14" fill="none" stroke="#F5F2FC" stroke-linecap="round" stroke-width="4"/>
+  </g>
+  <g font-family="Segoe UI, Helvetica Neue, Arial, sans-serif">
+    <text x="148" y="52" fill="#D0B8FF" font-size="13" font-weight="700" letter-spacing="2.4">WINDOWS CHAT OVERLAY</text>
+    <text x="146" y="95" fill="#F5F2FC" font-size="42" font-weight="600">Twitch Chat Window</text>
+    <text x="148" y="127" fill="#B7AFC6" font-size="19">Live Twitch chat on one screen</text>
+  </g>
+</svg>

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Twitch Chat Window mark</title>
+  <defs>
+    <linearGradient id="violet" x2="1" y2="1">
+      <stop stop-color="#BC98FF"/>
+      <stop offset="1" stop-color="#884DEB"/>
+    </linearGradient>
+  </defs>
+  <rect x="3" y="3" width="58" height="58" rx="15" fill="url(#violet)"/>
+  <path d="M21 16h22a9 9 0 0 1 9 9v12a9 9 0 0 1-9 9H28l-11 6v-7a9 9 0 0 1-5-8V25a9 9 0 0 1 9-9Z" fill="#16151F"/>
+  <path d="M21 27h22M21 35h14" fill="none" stroke="#F5F2FC" stroke-linecap="round" stroke-width="4"/>
+</svg>
