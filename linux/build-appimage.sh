@@ -73,6 +73,7 @@ if command -v dpkg-query >/dev/null; then
     done < "$root/out/bundled-packages.txt"
 fi
 cp "$root/linux/appimage/NATIVE-SOURCES.md" "$appdir/usr/share/doc/bundled-libraries/"
+cp "$root/linux/appimage/"*-LICENSE.txt "$appdir/usr/share/doc/bundled-libraries/"
 chmod -R a+rX "$appdir"
 ARCH=x86_64 "$tools_dir/appimagetool.AppImage" --no-appstream \
     --runtime-file "$tools_dir/runtime-x86_64" "$appdir" "$root/out/TwitchChatWindow-x86_64.AppImage"
