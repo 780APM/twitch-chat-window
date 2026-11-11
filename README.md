@@ -6,10 +6,13 @@ A small, always-on-top overlay that reads live public Twitch chat using only the
 
 ## CachyOS with KDE Plasma Wayland
 
-1. Install the native overlay library with `sudo pacman -S --needed gtk-layer-shell`.
-2. Extract **TwitchChatWindow-linux-x64.tar.gz** from the [latest GitHub release](https://github.com/780APM/twitch-chat-window/releases/latest). Open **twitch-chat-window** inside the extracted folder.
-3. Enter a Twitch username. Use **Opacity** and **Position** to adjust the overlay before starting your game.
-4. In Plasma **System Settings → Keyboard → Shortcuts**, add a command shortcut pointing to the full path of **twitch-chat-window**. Set it to **Ctrl+Shift+F10** or another free key combination. After you select **Click through**, use that shortcut to unlock the overlay in-game. Opening the executable again also unlocks it.
+Add the [signed pacman repository](https://github.com/780APM/twitch-chat-window-packages#install-on-cachyos) once. Install the overlay and its dependencies with `sudo pacman -Syu twitch-chat-window`, then open **Twitch Chat Window** from the app menu.
+
+Enter a Twitch username. Use **Opacity** and **Position** to adjust the overlay before starting your game.
+
+In Plasma **System Settings → Keyboard → Shortcuts**, assign **Ctrl+Shift+F10** or another free shortcut to the command `twitch-chat-window`. After you select **Click through**, use that shortcut to unlock the overlay in-game. Opening the app again also unlocks it.
+
+For a portable install, download **TwitchChatWindow-linux-x64.tar.gz** from the [latest GitHub release](https://github.com/780APM/twitch-chat-window/releases/latest), install `gtk-layer-shell` and run **twitch-chat-window** from the extracted folder.
 
 The Linux build targets 64-bit KDE Plasma Wayland. The **Position** controls use a screen corner and pixel offsets. Use the game’s **Borderless Fullscreen** or **Windowed** mode.
 

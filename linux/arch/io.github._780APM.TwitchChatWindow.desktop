@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Twitch Chat Window
+Comment=Read live Twitch chat while you play
+Exec=twitch-chat-window
+TryExec=twitch-chat-window
+Icon=twitch-chat-window
+Terminal=false
+Categories=Utility;

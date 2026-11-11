@@ -21,16 +21,7 @@ jobs:
           dotnet-quality: ga
       - name: Build Linux x64
         run: dotnet publish linux/TwitchChatWindow.Linux.csproj -c Release -r linux-x64 --self-contained -p:DebugType=None -o out/TwitchChatWindow
-      - name: Check the overlay on Arch Linux with KWin
-        run: |
-          docker run --rm --init -v "$PWD:/work:ro" -w /work archlinux:base bash -euc '
-            pacman -Syu --noconfirm --needed gtk-layer-shell kwin ttf-dejavu icu
-            useradd --create-home overlay-test
-            # Copy the compositor without its host scheduling capability for the virtual output.
-            cp /usr/bin/kwin_wayland /tmp/kwin_wayland
-            runuser -u overlay-test -- dbus-run-session -- bash linux/smoke-wayland.sh /work/out/TwitchChatWindow/twitch-chat-window /tmp/kwin_wayland
-          '
-      - name: Package Linux download
+      - name: Package portable Linux download
         run: |
           cp README.md out/TwitchChatWindow/README.md
           notices=out/TwitchChatWindow/licenses
@@ -40,10 +31,43 @@ jobs:
           cp /usr/share/common-licenses/LGPL-2 "$notices/gtksharp-license.txt"
           printf '%s\n' 'GtkSharp 3.24.24.95 source code' 'https://github.com/GtkSharp/GtkSharp' > "$notices/gtksharp-source.txt"
           tar -C out -czf TwitchChatWindow-linux-x64.tar.gz TwitchChatWindow
+      - name: Build and test the pacman package on Arch Linux with KWin
+        run: |
+          mkdir -p out/pacman-input out/pacman
+          cp linux/arch/PKGBUILD linux/arch/*.desktop linux/smoke-wayland.sh branding/mark.png \
+            TwitchChatWindow-linux-x64.tar.gz out/pacman-input/
+          docker run --rm --init -v "$PWD/out/pacman-input:/input:ro" -v "$PWD/out/pacman:/output" \
+            archlinux:base-devel bash -euc '
+              pacman -Syu --noconfirm --needed desktop-file-utils kwin ttf-dejavu
+              useradd --create-home overlay-test
+              runuser -u overlay-test -- bash -euc "cd /home/overlay-test
+                cp /input/* .
+                makepkg --geninteg >> PKGBUILD
+                makepkg --nodeps --noconfirm
+              "
+              package=(/home/overlay-test/twitch-chat-window-*.pkg.tar.zst)
+              pacman -U --noconfirm -- "${package[0]}"
+              desktop-file-validate /usr/share/applications/io.github._780APM.TwitchChatWindow.desktop
+              test -s /usr/share/icons/hicolor/512x512/apps/twitch-chat-window.png
+              # Copy the compositor without its host scheduling capability for the virtual output.
+              cp /usr/bin/kwin_wayland /tmp/kwin_wayland
+              runuser -u overlay-test -- dbus-run-session -- bash /input/smoke-wayland.sh /usr/bin/twitch-chat-window /tmp/kwin_wayland
+              install -m644 -- "${package[0]}" /output/
+              cd /output
+              repo-add twitch-chat-window.db.tar.gz twitch-chat-window-*.pkg.tar.zst
+            '
       - uses: actions/upload-artifact@v4
         with:
           name: TwitchChatWindow-linux-x64
           path: TwitchChatWindow-linux-x64.tar.gz
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TwitchChatWindow-pacman
+          path: |
+            out/pacman/twitch-chat-window-*.pkg.tar.zst
+            out/pacman/twitch-chat-window.db.tar.gz
+            out/pacman/twitch-chat-window.files.tar.gz
           if-no-files-found: error
 
   windows:
