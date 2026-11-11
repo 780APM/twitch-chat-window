@@ -37,7 +37,7 @@ jobs:
           cp -r linux/tests out/pacman-input/
           docker run --rm --init -v "$PWD/out/pacman-input:/input:ro" -v "$PWD/out/pacman:/output" \
             archlinux:base-devel bash -euc '
-              pacman -Syu --noconfirm --needed desktop-file-utils kwin ttf-dejavu python wayland xorg-xwayland
+              pacman -Syu --noconfirm --needed desktop-file-utils kwin kglobalacceld ttf-dejavu python wayland xorg-xwayland
               useradd --create-home overlay-test
               runuser -u overlay-test -- bash -euc "cd /home/overlay-test
                 cp -r /input/* .
@@ -88,6 +88,35 @@ jobs:
           mkdir release
           cp artifacts/TwitchChatWindow-linux-x64.tar.gz artifacts/TwitchChatWindow.exe \
             artifacts/twitch-chat-window-*.pkg.tar.zst release/
+          cp linux/install-cachyos.sh release/
+      - name: Sign native package and pacman repository
+        env:
+          PACMAN_SIGNING_KEY: ${{ secrets.PACMAN_SIGNING_KEY }}
+          PACMAN_SIGNING_PASSPHRASE: ${{ secrets.PACMAN_SIGNING_PASSPHRASE }}
+          PACMAN_SIGNING_FINGERPRINT: CDD0942F17CAD1625B4E67F89711FF2636622D60
+        run: |
+          test -n "$PACMAN_SIGNING_KEY"
+          test -n "$PACMAN_SIGNING_PASSPHRASE"
+          keydir=$(mktemp -d "$RUNNER_TEMP/pacman-key.XXXXXX")
+          trap 'rm -rf -- "$keydir"' EXIT
+          chmod 700 "$keydir"
+          printf '%s\n' "$PACMAN_SIGNING_KEY" > "$keydir/private.asc"
+          printf '%s\n' "$PACMAN_SIGNING_PASSPHRASE" > "$keydir/passphrase"
+          chmod 600 "$keydir/"*
+          mkdir signed
+          docker run --rm -e PACMAN_SIGNING_FINGERPRINT -v "$PWD:/source:ro" \
+            -v "$keydir:/keys:ro" -v "$PWD/signed:/output" archlinux:base-devel bash -euc '
+              pacman -Syu --noconfirm --needed gnupg
+              export GNUPGHOME=$(mktemp -d)
+              chmod 700 "$GNUPGHOME"
+              gpg --batch --import /keys/private.asc
+              export PACMAN_SIGNING_PASSPHRASE_FILE=/keys/passphrase
+              package=(/source/artifacts/twitch-chat-window-*.pkg.tar.zst)
+              test "${#package[@]}" -eq 1
+              bash /source/linux/sign-repository.sh "${package[0]}" /output
+            '
+          cp -L signed/twitch-chat-window.{db,db.sig,files,files.sig,asc} release/
+          cp signed/twitch-chat-window-*.pkg.tar.zst.sig release/
           cd release
           sha256sum * > SHA256SUMS
       - name: Publish GitHub release
@@ -97,6 +126,15 @@ jobs:
         run: |
           gh release create "$RELEASE_TAG" release/* --verify-tag --latest \
             --title "Twitch Chat Window $RELEASE_TAG" --notes-file linux/RELEASE-NOTES.md
+
+  verify-repository:
+    name: Verify public pacman installation
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: release
+    uses: ./.github/workflows/verify-pacman.yml
+    with:
+      fingerprint: CDD0942F17CAD1625B4E67F89711FF2636622D60
+      expected_tag: ${{ github.ref_name }}
 
   windows:
     name: Build Windows EXE

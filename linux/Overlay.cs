@@ -11,7 +11,8 @@ internal sealed class Overlay : ApplicationWindow
     private readonly ChatHistory history = new();
     private readonly Box controls = new(Orientation.Vertical, 7);
     private readonly Label status = LabelFor("Enter a Twitch username to start", "muted");
-    private readonly Label lockedHint = LabelFor("Run app again to unlock", "muted");
+    private readonly Label lockedHint = LabelFor("Ctrl+Shift+F10 to unlock", "muted");
+    private readonly Button pass = new("Click through");
     private readonly Button close = new("×");
     private readonly Button minimize = new("−");
     private readonly Entry channel = new() { PlaceholderText = "Twitch username", MaxLength = 30 };
@@ -94,8 +95,7 @@ internal sealed class Overlay : ApplicationWindow
             root.Opacity = opacity.Value / 100;
             opacityText.Text = $"Opacity {opacity.Value:0}%";
         };
-        var pass = new Button("Click through");
-        pass.TooltipText = "Launch Twitch Chat Window again to unlock. Set a KDE shortcut to do that in-game.";
+        pass.TooltipText = "Press Ctrl+Shift+F10 to unlock the running overlay.";
         pass.Clicked += (_, _) => ToggleClickThrough();
         var options = new Box(Orientation.Horizontal, 7);
         options.PackStart(opacityText, false, false, 0);
@@ -141,6 +141,11 @@ internal sealed class Overlay : ApplicationWindow
 
     public void ToggleClickThrough() => SetClickThrough(!clickThrough);
     public void Unlock() => SetClickThrough(false);
+    public void SetUnlockHint(string hint)
+    {
+        lockedHint.Text = hint;
+        pass.TooltipText = hint;
+    }
 
     private void SetClickThrough(bool enabled)
     {

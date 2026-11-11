@@ -25,13 +25,17 @@ internal static class Program
         WindowPlatform.UseX11();
         using var app = new Application(AppId, GLib.ApplicationFlags.None);
         using var toggle = new GLib.SimpleAction("toggle-click-through", null);
+        using var unlock = new GLib.SimpleAction("unlock-overlay", null);
         using var minimize = new GLib.SimpleAction("minimize", null);
         using var quit = new GLib.SimpleAction("quit", null);
         Overlay overlay = null;
+        GlobalShortcut shortcut = null;
         toggle.Activated += (_, _) => overlay?.ToggleClickThrough();
+        unlock.Activated += (_, _) => overlay?.Unlock();
         minimize.Activated += (_, _) => overlay?.Iconify();
         quit.Activated += (_, _) => overlay?.Destroy();
         app.AddAction(toggle);
+        app.AddAction(unlock);
         app.AddAction(minimize);
         app.AddAction(quit);
         app.Activated += (_, _) =>
@@ -44,8 +48,15 @@ internal static class Program
                 return;
             }
             overlay = new Overlay(app);
-            overlay.Destroyed += (_, _) => overlay = null;
+            overlay.Destroyed += (_, _) =>
+            {
+                shortcut?.Dispose();
+                shortcut = null;
+                overlay = null;
+            };
             overlay.ShowAll();
+            shortcut = GlobalShortcut.TryCreate(() => overlay?.Unlock());
+            overlay.SetUnlockHint(shortcut?.Hint ?? "Unlock from the taskbar");
         };
         return ((GLib.Application)app).Run();
     }

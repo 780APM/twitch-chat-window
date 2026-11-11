@@ -6,23 +6,38 @@ A small, always-on-top overlay that reads live public Twitch chat using only the
 
 ## CachyOS with KDE Plasma Wayland
 
-Download the native `twitch-chat-window-1.2.0-1-x86_64.pkg.tar.zst` package from the [latest GitHub release](https://github.com/780APM/twitch-chat-window/releases/latest). From the download folder, install it and its dependencies with:
+Set up the signed pacman repository once:
 
 ```sh
-sudo pacman -U ./twitch-chat-window-1.2.0-1-x86_64.pkg.tar.zst
+curl -fL https://github.com/780APM/twitch-chat-window/releases/latest/download/install-cachyos.sh -o install-twitch-chat-window.sh
+bash install-twitch-chat-window.sh
 ```
 
-Open **Twitch Chat Window** from the app menu. The chat overlay is the app’s only window, with its own taskbar entry. Drag the **Twitch Chat** title to place it anywhere on your desktop or across monitors, and drag the bottom-right grip to resize it. The **−** button minimizes the chat window; **×** quits.
+The script checks the repository key’s fingerprint, adds the key and repository, and runs `sudo pacman -Syu twitch-chat-window`. Pacman installs the app and its dependencies and adds **Twitch Chat Window** to your application menu. Pacman keeps its confirmation prompt so you can review the transaction.
 
-The separately maintained [signed pacman repository](https://github.com/780APM/twitch-chat-window-packages#install-on-cachyos) supports installation by package name with `sudo pacman -Syu twitch-chat-window`. Its releases may lag the direct downloads above.
+After that, install or update with:
+
+```sh
+sudo pacman -Syu twitch-chat-window
+```
+
+Regular `sudo pacman -Syu` upgrades also update the app. The signing-key fingerprint is `CDD0942F17CAD1625B4E67F89711FF2636622D60`.
+
+Open **Twitch Chat Window** from the app menu. It has one window and one taskbar entry. Drag the **Twitch Chat** title anywhere across your desktop and monitors, and drag the bottom-right grip to resize. **−** minimizes the chat window; **×** quits.
 
 Enter a Twitch username and use **Opacity** to adjust visibility before starting your game.
 
-In Plasma **System Settings → Keyboard → Shortcuts**, assign **Ctrl+Shift+F10** or another free shortcut to the command `twitch-chat-window`. After you select **Click through**, use that shortcut to unlock the overlay in-game. Opening the app again also unlocks it.
+Choose **Click through** before returning to your game. Press **Ctrl+Shift+F10** to unlock the running overlay without closing, restarting or relaunching it. KDE registers the shortcut automatically, including while another app has focus. You can customize **Unlock overlay** under **Twitch Chat Window** in Plasma’s **Keyboard → Shortcuts** settings. Existing assignments are preserved; another app’s shortcut is never taken over. Restoring the window from the taskbar also unlocks it.
 
-For a portable install, download **TwitchChatWindow-linux-x64.tar.gz** from the [latest GitHub release](https://github.com/780APM/twitch-chat-window/releases/latest), install `gtk3` and `xorg-xwayland`, then run **twitch-chat-window** from the extracted folder.
+For a portable install, download **TwitchChatWindow-linux-x64.tar.gz** from the [latest GitHub release](https://github.com/780APM/twitch-chat-window/releases/latest), install `gtk3`, `xorg-xwayland` and `kglobalacceld`, then run **twitch-chat-window** from the extracted folder.
 
 The Linux build targets 64-bit KDE Plasma and uses XWayland in a Wayland session to support free movement, a taskbar entry, always-on-top and click-through in a single window. It can also run in an X11 session. Window stacking over games depends on the compositor; use **Windowed** mode if a fullscreen game covers the overlay.
+
+### Updating from an older installation
+
+The old `twitch-chat-window-packages` repository remains unchanged. Its original signing private key was lost, so the current repository is hosted with the application’s releases and has the new fingerprint above. If you added an old `[twitch-chat-window]` section to `/etc/pacman.conf`, remove only that section before running the new setup script. If an older `/etc/pacman.d/twitch-chat-window.conf` exists, back it up and remove its include before the new setup.
+
+If an old user-local installation overrides the system launcher, remove only its `~/.local/share/applications/io.github._780APM.TwitchChatWindow.desktop` file after the pacman installation succeeds. The system package supplies the current launcher.
 
 ## Windows
 
@@ -47,6 +62,6 @@ The [brand assets](branding/README.md) include the logo, wordmark, and Windows i
 
 ## Publishing downloads
 
-Update the version in `linux/TwitchChatWindow.Linux.csproj` and `linux/arch/PKGBUILD`, then update `linux/RELEASE-NOTES.md`. Push a matching version tag such as `v1.2.0`. GitHub Actions builds Windows and Linux, tests the installed native package under KWin, and publishes the portable archive, native CachyOS package, Windows executable and SHA-256 checksums as a GitHub release after both builds pass.
+Update the version in `linux/TwitchChatWindow.Linux.csproj` and `linux/arch/PKGBUILD`, then update `linux/RELEASE-NOTES.md`. Push a matching version tag such as `v1.3.0`. GitHub Actions tests the native package and global unlock shortcut under KWin, builds Windows, and publishes downloads after both builds pass. The package and pacman database are signed using the encrypted private key and passphrase in the `PACMAN_SIGNING_KEY` and `PACMAN_SIGNING_PASSPHRASE` Actions secrets. The release also includes the public key, setup script, portable Linux archive, Windows executable and SHA-256 checksums. A clean Arch container then installs by name using the setup script and checks both package and database signatures.
 
-Direct-download packages do not update the separate signed pacman repository automatically. Publishing there requires its original package-signing private key; do not replace that key or weaken signature verification to publish an update.
+Back up the signing key and passphrase privately; never commit private key material. `linux/sign-repository.sh` signs a local package with `GNUPGHOME`, `PACMAN_SIGNING_FINGERPRINT` and `PACMAN_SIGNING_PASSPHRASE_FILE` set. The old separate package repository is not changed by this workflow.

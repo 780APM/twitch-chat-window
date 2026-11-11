@@ -123,6 +123,27 @@ with open(os.path.join(os.environ['SMOKE_RUNTIME'], 'overlay.log'), 'w') as log:
 
         action('toggle-click-through')
         wait_for(lambda: input_rectangles() == 0, 'click-through input region')
+        # Unlock using real compositor-wide key events while a native Wayland
+        # fullscreen client owns focus. Do not restart or activate the chat app.
+        game_env = os.environ.copy()
+        game_env['GDK_BACKEND'] = 'wayland'
+        with open(os.path.join(os.environ['SMOKE_RUNTIME'], 'game.log'), 'w') as game_log:
+            game = subprocess.Popen([os.environ['SMOKE_GAME']], env=game_env,
+                                    stdout=game_log, stderr=subprocess.STDOUT)
+            try:
+                wait_for(lambda: prop(root, '_NET_ACTIVE_WINDOW') != [window], 'native Wayland game focus')
+                subprocess.run([os.environ['SMOKE_POINTER'], 'unlock'], check=True, timeout=10)
+                wait_for(lambda: input_rectangles() > 0, 'Ctrl+Shift+F10 unlock with another app focused')
+                assert app.poll() is None and windows() == [window], 'Shortcut restarted the app'
+                assert prop(root, '_NET_ACTIVE_WINDOW') != [window], 'Unlock stole game focus'
+                subprocess.run([os.environ['SMOKE_POINTER'], 'unlock'], check=True, timeout=10)
+                time.sleep(.1)
+                assert input_rectangles() > 0, 'Pressing unlock again re-locked the window'
+            finally:
+                game.terminate()
+                game.wait(timeout=10)
+        action('toggle-click-through')
+        wait_for(lambda: input_rectangles() == 0, 'lock after global shortcut')
         action('minimize')
         wait_for(lambda: atom('_NET_WM_STATE_HIDDEN') in prop(window, '_NET_WM_STATE'), 'taskbar minimize')
         # A taskbar asks the window manager to activate the existing window.
@@ -140,7 +161,7 @@ with open(os.path.join(os.environ['SMOKE_RUNTIME'], 'overlay.log'), 'w') as log:
         assert windows() == [window], 'Relaunch created another window'
         action('quit')
         assert app.wait(timeout=10) == 0
-        print('Single taskbar window, always-on-top, free positioning, title dragging, resize, click-through, restore and quit passed.')
+        print('Single taskbar window, free movement, click-through, global unlock from native Wayland fullscreen, taskbar restore and quit passed.')
     finally:
         if app.poll() is None:
             app.terminate()

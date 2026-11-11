@@ -11,8 +11,8 @@ static void global(void *data, struct wl_registry *registry, uint32_t name,
                    const char *interface, uint32_t version)
 {
     (void)data;
-    if (!strcmp(interface, "org_kde_kwin_fake_input") && version >= 3)
-        input = wl_registry_bind(registry, name, &org_kde_kwin_fake_input_interface, 3);
+    if (!strcmp(interface, "org_kde_kwin_fake_input") && version >= 4)
+        input = wl_registry_bind(registry, name, &org_kde_kwin_fake_input_interface, 4);
 }
 static void removed(void *data, struct wl_registry *registry, uint32_t name)
 {
@@ -20,7 +20,7 @@ static void removed(void *data, struct wl_registry *registry, uint32_t name)
 }
 int main(int argc, char **argv)
 {
-    if (argc != 5) return 2;
+    if (argc != 5 && !(argc == 2 && !strcmp(argv[1], "unlock"))) return 2;
     struct wl_display *display = wl_display_connect(NULL);
     if (!display) return 1;
     struct wl_registry *registry = wl_display_get_registry(display);
@@ -28,6 +28,20 @@ int main(int argc, char **argv)
     wl_registry_add_listener(registry, &listener, NULL);
     if (wl_display_roundtrip(display) < 0 || !input) return 1;
     org_kde_kwin_fake_input_authenticate(input, "Twitch Chat smoke test", "Verify title dragging in isolated KWin");
+    if (argc == 2) {
+        const uint32_t keys[] = {29, 42, 68}; /* Left Ctrl, Left Shift, F10. */
+        for (int i = 0; i < 3; i++)
+            org_kde_kwin_fake_input_keyboard_key(input, keys[i], 1);
+        wl_display_roundtrip(display);
+        usleep(100000);
+        for (int i = 2; i >= 0; i--)
+            org_kde_kwin_fake_input_keyboard_key(input, keys[i], 0);
+        wl_display_roundtrip(display);
+        wl_proxy_destroy((struct wl_proxy *)input);
+        wl_registry_destroy(registry);
+        wl_display_disconnect(display);
+        return 0;
+    }
     org_kde_kwin_fake_input_pointer_motion_absolute(input,
         wl_fixed_from_int(atoi(argv[1])), wl_fixed_from_int(atoi(argv[2])));
     wl_display_roundtrip(display);
