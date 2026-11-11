@@ -148,9 +148,14 @@ with open(os.path.join(os.environ['SMOKE_RUNTIME'], 'overlay.log'), 'w') as log:
             subprocess.run(['desktop-file-validate', str(launcher)], check=True, timeout=10)
             pid = prop(window, '_NET_WM_PID')[0]
             maps = Path(f'/proc/{pid}/maps').read_text()
-            for library in ['libgtk-3.so', 'libicui18n.so.', 'libicuuc.so.', 'libicudata.so.']:
+            environment = dict(entry.split(b'=', 1) for entry in Path(f'/proc/{pid}/environ').read_bytes().split(b'\0') if b'=' in entry)
+            major = environment[b'DOTNET_SYSTEM_GLOBALIZATION_APPLOCALICU'].decode()
+            assert major.isdigit(), 'AppImage ICU version is missing'
+            # Host graphics drivers may additionally load a different ICU ABI.
+            # Check the version selected for .NET, rather than every ICU version.
+            for library in ['libgtk-3.so'] + [name + major for name in ['libicui18n.so.', 'libicuuc.so.', 'libicudata.so.']]:
                 loaded = [line for line in maps.splitlines() if library in line]
-                assert loaded and all('appimage_extracted_' in line or '/.mount_' in line for line in loaded), library + ' came from the host instead of the AppImage'
+                assert loaded and all('appimage_extracted_' in line or '/.mount_' in line for line in loaded), library + ' came from the host instead of the AppImage: ' + str(loaded)
         wait_for(lambda: atom('_NET_WM_STATE_ABOVE') in prop(window, '_NET_WM_STATE'), 'always on top')
         assert atom('_NET_WM_STATE_SKIP_TASKBAR') not in prop(window, '_NET_WM_STATE')
         assert atom('_NET_WM_WINDOW_TYPE_NORMAL') in prop(window, '_NET_WM_WINDOW_TYPE')

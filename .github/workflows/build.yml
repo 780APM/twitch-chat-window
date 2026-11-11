@@ -42,7 +42,7 @@ jobs:
           cp out/TwitchChatWindow-x86_64.AppImage linux/smoke-linux.sh linux/check-window.py out/appimage-test/
           cp -r linux/tests out/appimage-test/
           docker run --rm --init -v "$PWD/out/appimage-test:/input:ro" archlinux:base-devel bash -euc '
-            pacman -Syu --noconfirm --needed kwin kglobalacceld gtk3 desktop-file-utils ttf-dejavu python wayland xorg-xwayland
+            pacman -Syu --noconfirm --needed kwin kglobalacceld gtk3 mesa desktop-file-utils ttf-dejavu python wayland xorg-xwayland
             useradd --create-home overlay-test
             cp /usr/bin/kwin_wayland /tmp/kwin_wayland
             runuser -u overlay-test -- bash -euc "cd /home/overlay-test
