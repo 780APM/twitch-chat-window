@@ -62,7 +62,7 @@ internal static class LayerShell
         gtk_layer_init_for_window(window.Handle);
         gtk_layer_set_namespace(window.Handle, "twitch-chat-window");
         gtk_layer_set_layer(window.Handle, Layer.Overlay);
-        SetClickThrough(window, false);
+        gtk_layer_set_keyboard_mode(window.Handle, Keyboard.OnDemand);
     }
 
     public static void Position(Window window, bool right, bool bottom, int horizontal, int vertical)
@@ -81,12 +81,14 @@ internal static class LayerShell
         if (clickThrough)
         {
             using var empty = new Cairo.Region();
-            window.InputShapeCombineRegion(empty);
+            window.Window.InputShapeCombineRegion(empty, 0, 0);
         }
         else
         {
-            window.InputShapeCombineRegion(null);
+            window.Window.InputShapeCombineRegion(null, 0, 0);
         }
+        // GDK sends the input region to Wayland with the next surface commit.
+        window.QueueDraw();
     }
 
     [DllImport("libgdk-3.so.0")] private static extern void gdk_set_allowed_backends(string backends);

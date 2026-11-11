@@ -21,12 +21,13 @@ jobs:
           dotnet-quality: ga
       - name: Build Linux x64
         run: dotnet publish linux/TwitchChatWindow.Linux.csproj -c Release -r linux-x64 --self-contained -o out/TwitchChatWindow
-      - name: Install Wayland test dependencies
+      - name: Check the overlay on Arch Linux with KWin
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends dbus-x11 libgtk-layer-shell0 sway
-      - name: Check the overlay in a Wayland session
-        run: dbus-run-session -- bash linux/smoke-wayland.sh "$PWD/out/TwitchChatWindow/twitch-chat-window"
+          docker run --rm --init -v "$PWD:/work:ro" -w /work archlinux:base bash -euc '
+            pacman -Syu --noconfirm --needed gtk-layer-shell kwin ttf-dejavu icu
+            useradd --create-home overlay-test
+            runuser -u overlay-test -- dbus-run-session -- bash linux/smoke-wayland.sh /work/out/TwitchChatWindow/twitch-chat-window
+          '
       - name: Package Linux download
         run: |
           cp README.md out/TwitchChatWindow/README.md
