@@ -33,7 +33,10 @@ jobs:
           printf '\n[twitch-chat-window]\nSigLevel = PackageRequired DatabaseRequired TrustedOnly\nServer = %s\n' \
             "$server" >> /etc/pacman.conf
           pacman -Syu --noconfirm twitch-chat-window
-          pacman -Qkk twitch-chat-window
+          # The base container's NoExtract rules intentionally skip package documentation.
+          pacman -Q twitch-chat-window
           test -x /usr/bin/twitch-chat-window
-          test -f /usr/share/applications/io.github._780APM.TwitchChatWindow.desktop
+          test -s /usr/lib/twitch-chat-window/twitch-chat-window.dll
+          test -s /usr/share/applications/io.github._780APM.TwitchChatWindow.desktop
+          test -s /usr/share/icons/hicolor/512x512/apps/twitch-chat-window.png
           SCRIPT
