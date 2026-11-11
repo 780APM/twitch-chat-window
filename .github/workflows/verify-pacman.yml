@@ -1,0 +1,39 @@
+name: Verify published pacman repository
+
+on:
+  workflow_dispatch:
+    inputs:
+      fingerprint:
+        description: Expected public package-signing key fingerprint
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  install:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Install by name with package and database signature checks
+        env:
+          FINGERPRINT: ${{ inputs.fingerprint }}
+        run: |
+          docker run --rm --init -i -e FINGERPRINT archlinux:base bash -euo pipefail <<'SCRIPT'
+          [[ "$FINGERPRINT" =~ ^[0-9A-F]{40}$ ]]
+          pacman -Syu --needed --noconfirm curl
+          server=https://github.com/780APM/twitch-chat-window-packages/releases/latest/download
+          curl -fLsS "$server/twitch-chat-window.asc" -o /tmp/twitch-chat-window.asc
+          actual=$(gpg --batch --show-keys --with-colons /tmp/twitch-chat-window.asc |
+            awk -F: '$1 == "pub" { primary = 1; next } primary && $1 == "fpr" { print $10; primary = 0 }')
+          [[ "$actual" == "$FINGERPRINT" ]]
+          pacman-key --init
+          pacman-key --add /tmp/twitch-chat-window.asc
+          pacman-key --lsign-key "$FINGERPRINT"
+          printf '\n[twitch-chat-window]\nSigLevel = PackageRequired DatabaseRequired TrustedOnly\nServer = %s\n' \
+            "$server" >> /etc/pacman.conf
+          pacman -Syu --noconfirm twitch-chat-window
+          pacman -Qkk twitch-chat-window
+          test -x /usr/bin/twitch-chat-window
+          test -f /usr/share/applications/io.github._780APM.TwitchChatWindow.desktop
+          SCRIPT
