@@ -2,7 +2,7 @@ name: Build desktop downloads
 
 on:
   push:
-    branches: [main, linux-cachyos]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -20,7 +20,7 @@ jobs:
           dotnet-version: 10.0.x
           dotnet-quality: ga
       - name: Build Linux x64
-        run: dotnet publish linux/TwitchChatWindow.Linux.csproj -c Release -r linux-x64 --self-contained -o out/TwitchChatWindow
+        run: dotnet publish linux/TwitchChatWindow.Linux.csproj -c Release -r linux-x64 --self-contained -p:DebugType=None -o out/TwitchChatWindow
       - name: Check the overlay on Arch Linux with KWin
         run: |
           docker run --rm --init -v "$PWD:/work:ro" -w /work archlinux:base bash -euc '
@@ -33,6 +33,12 @@ jobs:
       - name: Package Linux download
         run: |
           cp README.md out/TwitchChatWindow/README.md
+          notices=out/TwitchChatWindow/licenses
+          mkdir "$notices"
+          cp "$DOTNET_ROOT/LICENSE.txt" "$notices/dotnet-license.txt"
+          cp "$DOTNET_ROOT/ThirdPartyNotices.txt" "$notices/dotnet-third-party-notices.txt"
+          cp /usr/share/common-licenses/LGPL-2 "$notices/gtksharp-license.txt"
+          printf '%s\n' 'GtkSharp 3.24.24.95 source code' 'https://github.com/GtkSharp/GtkSharp' > "$notices/gtksharp-source.txt"
           tar -C out -czf TwitchChatWindow-linux-x64.tar.gz TwitchChatWindow
       - uses: actions/upload-artifact@v4
         with:
