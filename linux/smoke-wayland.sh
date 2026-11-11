@@ -37,8 +37,9 @@ overlay_pid=$!
 
 wait_for_log() {
     local pattern=$1
+    local start=${2:-1}
     for ((attempt=0; attempt<100; attempt++)); do
-        if grep -Eq "$pattern" "$runtime/overlay.log"; then return; fi
+        if tail -n "+$start" "$runtime/overlay.log" | grep -E "$pattern" >/dev/null; then return; fi
         kill -0 "$overlay_pid"
         sleep .1
     done
@@ -49,20 +50,16 @@ wait_for_log() {
 wait_for_log 'get_layer_surface.*3, "twitch-chat-window"'
 wait_for_log 'set_keyboard_interactivity\(2\)'
 wait_for_log 'wl_surface.*\.attach\(wl_buffer'
+lock_start=$(( $(wc -l < "$runtime/overlay.log") + 1 ))
 gapplication action "$app_id" toggle-click-through
-wait_for_log 'set_keyboard_interactivity\(0\)'
-wait_for_log 'set_input_region\(wl_region'
+wait_for_log 'set_keyboard_interactivity\(0\)' "$lock_start"
+wait_for_log 'set_input_region\(wl_region' "$lock_start"
+wait_for_log 'wl_surface.*\.commit\(' "$lock_start"
 
 # Launch again through the normal entry point, as a desktop shortcut would.
-locked_line=$(wc -l < "$runtime/overlay.log")
+unlock_start=$(( $(wc -l < "$runtime/overlay.log") + 1 ))
 "$executable"
-for ((attempt=0; attempt<100; attempt++)); do
-    if tail -n "+$locked_line" "$runtime/overlay.log" | grep -Eq 'set_keyboard_interactivity\(2\)'; then
-        echo 'Wayland overlay, click-through and launch-to-unlock passed.'
-        exit 0
-    fi
-    kill -0 "$overlay_pid"
-    sleep .1
-done
-echo 'The overlay did not unlock.'
-exit 1
+wait_for_log 'set_keyboard_interactivity\(2\)' "$unlock_start"
+wait_for_log 'set_input_region\(nil\)' "$unlock_start"
+wait_for_log 'wl_surface.*\.commit\(' "$unlock_start"
+echo 'Wayland overlay, click-through and launch-to-unlock passed.'

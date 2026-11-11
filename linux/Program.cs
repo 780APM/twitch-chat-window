@@ -78,17 +78,18 @@ internal static class LayerShell
     public static void SetClickThrough(Window window, bool clickThrough)
     {
         gtk_layer_set_keyboard_mode(window.Handle, clickThrough ? Keyboard.None : Keyboard.OnDemand);
+        var gdkWindow = window.Window;
         if (clickThrough)
         {
             using var empty = new Cairo.Region();
-            window.Window.InputShapeCombineRegion(empty, 0, 0);
+            gdkWindow.InputShapeCombineRegion(empty, 0, 0);
         }
         else
         {
-            window.Window.InputShapeCombineRegion(null, 0, 0);
+            gdkWindow.InputShapeCombineRegion(null, 0, 0);
         }
-        // GDK sends the input region to Wayland with the next surface commit.
-        window.QueueDraw();
+        // Commit the new input state even when the compositor is withholding frame callbacks.
+        WaylandInput.Commit(gdkWindow, clickThrough);
     }
 
     [DllImport("libgdk-3.so.0")] private static extern void gdk_set_allowed_backends(string backends);
@@ -99,4 +100,40 @@ internal static class LayerShell
     [DllImport(Library)] private static extern void gtk_layer_set_keyboard_mode(IntPtr window, Keyboard mode);
     [DllImport(Library)] private static extern void gtk_layer_set_anchor(IntPtr window, Edge edge, int anchor);
     [DllImport(Library)] private static extern void gtk_layer_set_margin(IntPtr window, Edge edge, int margin);
+}
+
+internal static class WaylandInput
+{
+    private const string Wayland = "libwayland-client.so.0";
+    private const uint CreateRegion = 1, SetInputRegion = 5, CommitSurface = 6, DestroyRegion = 0;
+    private const uint DestroyProxy = 1;
+    private static readonly IntPtr RegionInterface =
+        NativeLibrary.GetExport(NativeLibrary.Load(Wayland), "wl_region_interface");
+
+    public static void Commit(Gdk.Window window, bool clickThrough)
+    {
+        var surface = gdk_wayland_window_get_wl_surface(window.Handle);
+        var region = IntPtr.Zero;
+        if (clickThrough)
+        {
+            var compositor = gdk_wayland_display_get_wl_compositor(window.Display.Handle);
+            var newId = IntPtr.Zero;
+            region = SendWithObject(compositor, CreateRegion, RegionInterface, wl_proxy_get_version(compositor), 0, ref newId);
+        }
+
+        var surfaceVersion = wl_proxy_get_version(surface);
+        SendWithObject(surface, SetInputRegion, IntPtr.Zero, surfaceVersion, 0, ref region);
+        Send(surface, CommitSurface, IntPtr.Zero, surfaceVersion, 0, IntPtr.Zero);
+        if (region != IntPtr.Zero)
+            Send(region, DestroyRegion, IntPtr.Zero, wl_proxy_get_version(region), DestroyProxy, IntPtr.Zero);
+        window.Display.Flush();
+    }
+
+    [DllImport("libgdk-3.so.0")] private static extern IntPtr gdk_wayland_window_get_wl_surface(IntPtr window);
+    [DllImport("libgdk-3.so.0")] private static extern IntPtr gdk_wayland_display_get_wl_compositor(IntPtr display);
+    [DllImport(Wayland)] private static extern uint wl_proxy_get_version(IntPtr proxy);
+    [DllImport(Wayland, EntryPoint = "wl_proxy_marshal_array_flags")]
+    private static extern IntPtr Send(IntPtr proxy, uint opcode, IntPtr type, uint version, uint flags, IntPtr args);
+    [DllImport(Wayland, EntryPoint = "wl_proxy_marshal_array_flags")]
+    private static extern IntPtr SendWithObject(IntPtr proxy, uint opcode, IntPtr type, uint version, uint flags, ref IntPtr argument);
 }

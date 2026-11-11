@@ -11,7 +11,7 @@ internal sealed class Overlay : ApplicationWindow
     private readonly ChatHistory history = new();
     private readonly Box controls = new(Orientation.Vertical, 7);
     private readonly Label status = LabelFor("Enter a Twitch username to start", "muted");
-    private readonly Label lockedHint = LabelFor("Open launcher to unlock", "muted");
+    private readonly Label lockedHint = LabelFor("Run app again to unlock", "muted");
     private readonly Button close = new("×");
     private readonly Entry channel = new() { PlaceholderText = "Twitch username", MaxLength = 30 };
     private readonly TextView feed = new()
@@ -118,11 +118,11 @@ internal sealed class Overlay : ApplicationWindow
         corner.Active = 0;
         var horizontal = new SpinButton(0, Math.Max(0, geometry.Width - WindowWidth - 20), 1)
         {
-            Value = 18, Numeric = true, TooltipText = "Horizontal distance from the selected corner"
+            Value = 18, Numeric = true, WidthChars = 4, TooltipText = "Horizontal distance from the selected corner"
         };
         var vertical = new SpinButton(0, Math.Max(0, geometry.Height - WindowHeight - 20), 1)
         {
-            Value = 18, Numeric = true, TooltipText = "Vertical distance from the selected corner"
+            Value = 18, Numeric = true, WidthChars = 4, TooltipText = "Vertical distance from the selected corner"
         };
         void Move()
         {
