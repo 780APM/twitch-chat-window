@@ -12,17 +12,17 @@ Download the native `twitch-chat-window-1.2.0-1-x86_64.pkg.tar.zst` package from
 sudo pacman -U ./twitch-chat-window-1.2.0-1-x86_64.pkg.tar.zst
 ```
 
-Open **Twitch Chat Window** from the app menu. The app has a normal control window in the taskbar and a separate chat overlay. Minimize the control window while you play; the overlay stays visible. Restore it from the taskbar to unlock the overlay or change click-through mode. Closing either window quits the app.
+Open **Twitch Chat Window** from the app menu. The chat overlay is the app’s only window, with its own taskbar entry. Drag the **Twitch Chat** title to place it anywhere on your desktop or across monitors, and drag the bottom-right grip to resize it. The **−** button minimizes the chat window; **×** quits.
 
 The separately maintained [signed pacman repository](https://github.com/780APM/twitch-chat-window-packages#install-on-cachyos) supports installation by package name with `sudo pacman -Syu twitch-chat-window`. Its releases may lag the direct downloads above.
 
-Enter a Twitch username. Use **Opacity** and **Position** to adjust the overlay before starting your game.
+Enter a Twitch username and use **Opacity** to adjust visibility before starting your game.
 
 In Plasma **System Settings → Keyboard → Shortcuts**, assign **Ctrl+Shift+F10** or another free shortcut to the command `twitch-chat-window`. After you select **Click through**, use that shortcut to unlock the overlay in-game. Opening the app again also unlocks it.
 
-For a portable install, download **TwitchChatWindow-linux-x64.tar.gz** from the [latest GitHub release](https://github.com/780APM/twitch-chat-window/releases/latest), install `gtk-layer-shell` and run **twitch-chat-window** from the extracted folder.
+For a portable install, download **TwitchChatWindow-linux-x64.tar.gz** from the [latest GitHub release](https://github.com/780APM/twitch-chat-window/releases/latest), install `gtk3` and `xorg-xwayland`, then run **twitch-chat-window** from the extracted folder.
 
-The Linux build targets 64-bit KDE Plasma Wayland. The **Position** controls use a screen corner and pixel offsets. Use the game’s **Borderless Fullscreen** or **Windowed** mode.
+The Linux build targets 64-bit KDE Plasma and uses XWayland in a Wayland session to support free movement, a taskbar entry, always-on-top and click-through in a single window. It can also run in an X11 session. Window stacking over games depends on the compositor; use **Windowed** mode if a fullscreen game covers the overlay.
 
 ## Windows
 
@@ -39,7 +39,7 @@ The EXE runs on Windows 10 or 11 with .NET Framework 4.8 or later. It uses Twitc
 
 On Windows, run `powershell -ExecutionPolicy Bypass -File .\Build.ps1` in the project folder. The script uses the compiler included in Windows .NET Framework and creates `TwitchChatWindow.exe` in the same folder.
 
-On Linux, install the .NET 10 SDK and `gtk-layer-shell`, then run `./linux/build.sh`. Launch `out/TwitchChatWindow/twitch-chat-window`. The script also creates `out/TwitchChatWindow-linux-x64.tar.gz`, including the runtime and third-party notices. If the SDK is installed outside your PATH, set `DOTNET=/path/to/dotnet` when running the script.
+On Linux, install the .NET 10 SDK, `gtk3` and `xorg-xwayland`, then run `./linux/build.sh`. Launch `out/TwitchChatWindow/twitch-chat-window`. The script also creates `out/TwitchChatWindow-linux-x64.tar.gz`, including the runtime and third-party notices. If the SDK is installed outside your PATH, set `DOTNET=/path/to/dotnet` when running the script.
 
 On CachyOS/Arch, install `base-devel` and run `./linux/build.sh --pacman` to also create a native package in `out/pacman/`. Install it with `sudo pacman -U out/pacman/twitch-chat-window-*.pkg.tar.zst`. This installs the desktop entry, icon and application files; pacman resolves the runtime dependencies. Building the package itself does not require those runtime dependencies to be installed.
 

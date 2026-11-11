@@ -1,11 +1,11 @@
 pkgname=twitch-chat-window
 pkgver=1.2.0
 pkgrel=1
-pkgdesc='Always-on-top Twitch chat overlay for KDE Plasma Wayland'
+pkgdesc='Movable always-on-top Twitch chat window for KDE Plasma'
 arch=('x86_64')
 url='https://github.com/780APM/twitch-chat-window-packages'
 license=('LicenseRef-Proprietary')
-depends=('ca-certificates' 'glibc' 'gtk-layer-shell' 'hicolor-icon-theme' 'icu'
+depends=('ca-certificates' 'glibc' 'gtk3' 'xorg-xwayland' 'hicolor-icon-theme' 'icu'
          'krb5' 'libgcc' 'libstdc++' 'openssl' 'tzdata' 'zlib')
 options=('!strip' '!debug')
 source=('TwitchChatWindow-linux-x64.tar.gz' 'io.github._780APM.TwitchChatWindow.desktop' 'mark.png')

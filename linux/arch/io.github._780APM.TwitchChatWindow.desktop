@@ -7,4 +7,5 @@ TryExec=twitch-chat-window
 Icon=twitch-chat-window
 Terminal=false
 StartupNotify=true
+StartupWMClass=io.github._780APM.TwitchChatWindow
 Categories=Utility;

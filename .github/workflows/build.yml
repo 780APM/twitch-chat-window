@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   linux:
-    name: Build and check Wayland overlay
+    name: Build and check single Linux window
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:
@@ -32,14 +32,15 @@ jobs:
       - name: Build and test the pacman package on Arch Linux with KWin
         run: |
           mkdir -p out/pacman-input out/pacman
-          cp linux/arch/PKGBUILD linux/arch/*.desktop linux/smoke-wayland.sh branding/mark.png \
+          cp linux/arch/PKGBUILD linux/arch/*.desktop linux/smoke-linux.sh linux/check-window.py branding/mark.png \
             out/TwitchChatWindow-linux-x64.tar.gz out/pacman-input/
+          cp -r linux/tests out/pacman-input/
           docker run --rm --init -v "$PWD/out/pacman-input:/input:ro" -v "$PWD/out/pacman:/output" \
             archlinux:base-devel bash -euc '
-              pacman -Syu --noconfirm --needed desktop-file-utils kwin ttf-dejavu
+              pacman -Syu --noconfirm --needed desktop-file-utils kwin ttf-dejavu python wayland xorg-xwayland
               useradd --create-home overlay-test
               runuser -u overlay-test -- bash -euc "cd /home/overlay-test
-                cp /input/* .
+                cp -r /input/* .
                 makepkg --geninteg >> PKGBUILD
                 makepkg --nodeps --noconfirm
               "
@@ -49,7 +50,7 @@ jobs:
               test -s /usr/share/icons/hicolor/512x512/apps/twitch-chat-window.png
               # Copy the compositor without its host scheduling capability for the virtual output.
               cp /usr/bin/kwin_wayland /tmp/kwin_wayland
-              runuser -u overlay-test -- dbus-run-session -- bash /input/smoke-wayland.sh /usr/bin/twitch-chat-window /tmp/kwin_wayland
+              runuser -u overlay-test -- dbus-run-session -- bash /input/smoke-linux.sh /usr/bin/twitch-chat-window /tmp/kwin_wayland
               install -m644 -- "${package[0]}" /output/
               cd /output
               repo-add twitch-chat-window.db.tar.gz twitch-chat-window-*.pkg.tar.zst

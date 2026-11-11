@@ -13,6 +13,7 @@ internal sealed class Overlay : ApplicationWindow
     private readonly Label status = LabelFor("Enter a Twitch username to start", "muted");
     private readonly Label lockedHint = LabelFor("Run app again to unlock", "muted");
     private readonly Button close = new("×");
+    private readonly Button minimize = new("−");
     private readonly Entry channel = new() { PlaceholderText = "Twitch username", MaxLength = 30 };
     private readonly TextView feed = new()
     {
@@ -28,17 +29,17 @@ internal sealed class Overlay : ApplicationWindow
     private uint refreshTimer;
     private bool clickThrough;
 
-    public bool IsClickThrough => clickThrough;
-    public event EventHandler ClickThroughChanged;
-
     public Overlay(Application app) : base(app)
     {
         Title = "Twitch Chat Window";
         Decorated = false;
         Visual = Screen.RgbaVisual;
         FocusOnMap = false;
+        SkipTaskbarHint = false;
+        SkipPagerHint = false;
+        KeepAbove = true;
         SetDefaultSize(WindowWidth, WindowHeight);
-        LayerShell.Initialize(this);
+        FocusInEvent += (_, _) => Unlock();
 
         using var css = new CssProvider();
         css.LoadFromData(Styles);
@@ -51,13 +52,29 @@ internal sealed class Overlay : ApplicationWindow
 
         using var icon = new Gdk.Pixbuf(Assembly.GetExecutingAssembly(), "mark.png", 24, 24);
         var header = new Box(Orientation.Horizontal, 7);
-        header.PackStart(new Image(icon), false, false, 0);
-        header.PackStart(LabelFor("Twitch Chat", "title"), false, false, 0);
+        Icon = icon;
+        var title = new Box(Orientation.Horizontal, 7);
+        title.PackStart(new Image(icon), false, false, 0);
+        title.PackStart(LabelFor("Twitch Chat", "title"), false, false, 0);
+        var drag = new EventBox { VisibleWindow = false, AboveChild = true, TooltipText = "Drag to move anywhere on your desktop" };
+        drag.Add(title);
+        drag.AddEvents((int)Gdk.EventMask.ButtonPressMask);
+        drag.ButtonPressEvent += (_, args) =>
+        {
+            if (args.Event.Button != 1 || clickThrough)
+                return;
+            BeginMoveDrag(1, (int)args.Event.XRoot, (int)args.Event.YRoot, args.Event.Time);
+            args.RetVal = true;
+        };
+        header.PackStart(drag, true, true, 0);
         lockedHint.NoShowAll = true;
         header.PackEnd(lockedHint, false, false, 0);
         close.TooltipText = "Close";
         close.Clicked += (_, _) => Destroy();
         header.PackEnd(close, false, false, 0);
+        minimize.TooltipText = "Minimize to taskbar";
+        minimize.Clicked += (_, _) => Iconify();
+        header.PackEnd(minimize, false, false, 0);
         root.PackStart(header, false, false, 0);
 
         var connect = new Button("Connect");
@@ -86,7 +103,6 @@ internal sealed class Overlay : ApplicationWindow
         options.PackEnd(pass, false, false, 0);
         controls.PackStart(options, false, false, 0);
 
-        controls.PackStart(CreatePositionControls(), false, false, 0);
         root.PackStart(controls, false, false, 0);
 
         feed.Buffer.TagTable.Add(timestamp);
@@ -100,7 +116,20 @@ internal sealed class Overlay : ApplicationWindow
         chatView.AddNamed(scroller, "chat");
         chatView.VisibleChildName = "empty";
         root.PackStart(chatView, true, true, 0);
-        root.PackStart(status, false, false, 0);
+        var footer = new Box(Orientation.Horizontal, 7);
+        footer.PackStart(status, true, true, 0);
+        var resize = new EventBox { VisibleWindow = false, TooltipText = "Drag to resize" };
+        resize.Add(new Label("◢"));
+        resize.AddEvents((int)Gdk.EventMask.ButtonPressMask);
+        resize.ButtonPressEvent += (_, args) =>
+        {
+            if (args.Event.Button != 1 || clickThrough)
+                return;
+            BeginResizeDrag(Gdk.WindowEdge.SouthEast, 1, (int)args.Event.XRoot, (int)args.Event.YRoot, args.Event.Time);
+            args.RetVal = true;
+        };
+        footer.PackEnd(resize, false, false, 0);
+        root.PackStart(footer, false, false, 0);
 
         Destroyed += (_, _) =>
         {
@@ -108,43 +137,6 @@ internal sealed class Overlay : ApplicationWindow
                 GLib.Source.Remove(refreshTimer);
             chat?.Dispose();
         };
-    }
-
-    private Box CreatePositionControls()
-    {
-        var display = Gdk.Display.Default;
-        var monitor = display.PrimaryMonitor ?? display.GetMonitor(0);
-        var geometry = monitor.Geometry;
-        var corner = new ComboBoxText();
-        foreach (var text in new[] { "Top right", "Top left", "Bottom right", "Bottom left" })
-            corner.AppendText(text);
-        corner.Active = 0;
-        var horizontal = new SpinButton(0, Math.Max(0, geometry.Width - WindowWidth - 20), 1)
-        {
-            Value = 18, Numeric = true, WidthChars = 4, TooltipText = "Horizontal distance from the selected corner"
-        };
-        var vertical = new SpinButton(0, Math.Max(0, geometry.Height - WindowHeight - 20), 1)
-        {
-            Value = 18, Numeric = true, WidthChars = 4, TooltipText = "Vertical distance from the selected corner"
-        };
-        void Move()
-        {
-            LayerShell.Position(this, corner.Active % 2 == 0, corner.Active >= 2,
-                horizontal.ValueAsInt, vertical.ValueAsInt);
-        }
-        corner.Changed += (_, _) => Move();
-        horizontal.ValueChanged += (_, _) => Move();
-        vertical.ValueChanged += (_, _) => Move();
-        Move();
-
-        var row = new Box(Orientation.Horizontal, 7);
-        row.PackStart(LabelFor("Position", "muted"), false, false, 0);
-        row.PackStart(corner, true, true, 0);
-        row.PackStart(LabelFor("X", "muted"), false, false, 0);
-        row.PackStart(horizontal, false, false, 0);
-        row.PackStart(LabelFor("Y", "muted"), false, false, 0);
-        row.PackStart(vertical, false, false, 0);
-        return row;
     }
 
     public void ToggleClickThrough() => SetClickThrough(!clickThrough);
@@ -155,11 +147,19 @@ internal sealed class Overlay : ApplicationWindow
         if (clickThrough == enabled)
             return;
         clickThrough = enabled;
-        LayerShell.SetClickThrough(this, enabled);
         controls.Visible = !enabled;
         close.Visible = !enabled;
+        minimize.Visible = !enabled;
         lockedHint.Visible = enabled;
-        ClickThroughChanged?.Invoke(this, EventArgs.Empty);
+        WindowPlatform.SetClickThrough(this, enabled);
+        // Hiding controls queues GTK layout work which can rebuild the native
+        // input region. Apply it again once that work has completed.
+        GLib.Idle.Add(() =>
+        {
+            if (IsRealized && clickThrough == enabled)
+                WindowPlatform.SetClickThrough(this, enabled);
+            return false;
+        });
     }
 
     private void ConnectChannel()

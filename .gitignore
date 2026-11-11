@@ -1,4 +1,5 @@
 /TwitchChatWindow.exe
 /linux/bin/
 /linux/obj/
+/linux/__pycache__/
 /out/
