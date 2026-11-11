@@ -26,7 +26,9 @@ jobs:
           docker run --rm --init -v "$PWD:/work:ro" -w /work archlinux:base bash -euc '
             pacman -Syu --noconfirm --needed gtk-layer-shell kwin ttf-dejavu icu
             useradd --create-home overlay-test
-            runuser -u overlay-test -- dbus-run-session -- bash linux/smoke-wayland.sh /work/out/TwitchChatWindow/twitch-chat-window
+            # Copy the compositor without its host scheduling capability for the virtual output.
+            cp /usr/bin/kwin_wayland /tmp/kwin_wayland
+            runuser -u overlay-test -- dbus-run-session -- bash linux/smoke-wayland.sh /work/out/TwitchChatWindow/twitch-chat-window /tmp/kwin_wayland
           '
       - name: Package Linux download
         run: |

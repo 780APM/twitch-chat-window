@@ -2,6 +2,7 @@
 set -euo pipefail
 
 executable=$1
+compositor=$2
 runtime=$(mktemp -d)
 export XDG_RUNTIME_DIR=$runtime
 export XDG_SESSION_TYPE=wayland
@@ -21,7 +22,7 @@ cleanup() {
 trap cleanup EXIT
 
 export WAYLAND_DISPLAY=wayland-overlay-test
-kwin_wayland --virtual --width 1280 --height 720 --socket "$WAYLAND_DISPLAY" \
+"$compositor" --virtual --width 1280 --height 720 --socket "$WAYLAND_DISPLAY" \
     --no-lockscreen --no-global-shortcuts > "$runtime/kwin.log" 2>&1 &
 kwin_pid=$!
 for ((attempt=0; attempt<100; attempt++)); do
