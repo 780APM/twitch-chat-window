@@ -274,6 +274,51 @@ namespace TwitchChatWindow
         }
     }
 
+    internal sealed class ChatHistory
+    {
+        private readonly List<ChatMessage> messages = new List<ChatMessage>();
+
+        public int Count { get { return messages.Count; } }
+        public ChatMessage this[int index] { get { return messages[index]; } }
+        public void Clear() { messages.Clear(); }
+
+        // Return the first row to render. A removal requires rebuilding the text buffer.
+        public int Apply(IrcLine[] lines)
+        {
+            int firstNew = messages.Count;
+            foreach (IrcLine line in lines)
+            {
+                switch (line.Command)
+                {
+                    case "PRIVMSG":
+                        messages.Add(new ChatMessage(line));
+                        break;
+                    case "CLEARMSG":
+                        string id = line.Tag("target-msg-id");
+                        if (id.Length > 0 && messages.RemoveAll(message => message.Id == id) > 0)
+                            firstNew = 0;
+                        break;
+                    case "CLEARCHAT":
+                        if (String.IsNullOrEmpty(line.Trailing))
+                        {
+                            messages.Clear();
+                            firstNew = 0;
+                        }
+                        else if (messages.RemoveAll(message => String.Equals(message.Login, line.Trailing,
+                            StringComparison.OrdinalIgnoreCase)) > 0)
+                            firstNew = 0;
+                        break;
+                }
+            }
+            if (messages.Count > 240)
+            {
+                messages.RemoveRange(0, messages.Count - 200);
+                firstNew = 0;
+            }
+            return firstNew;
+        }
+    }
+
     internal sealed class ChatMessage
     {
         public readonly string Id;

@@ -1,0 +1,51 @@
+name: Build desktop downloads
+
+on:
+  push:
+    branches: [main, linux-cachyos]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: Build and check Wayland overlay
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+          dotnet-quality: ga
+      - name: Build Linux x64
+        run: dotnet publish linux/TwitchChatWindow.Linux.csproj -c Release -r linux-x64 --self-contained -o out/TwitchChatWindow
+      - name: Install Wayland test dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends dbus-x11 libgtk-layer-shell0 sway
+      - name: Check the overlay in a Wayland session
+        run: dbus-run-session -- bash linux/smoke-wayland.sh "$PWD/out/TwitchChatWindow/twitch-chat-window"
+      - name: Package Linux download
+        run: |
+          cp README.md out/TwitchChatWindow/README.md
+          tar -C out -czf TwitchChatWindow-linux-x64.tar.gz TwitchChatWindow
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TwitchChatWindow-linux-x64
+          path: TwitchChatWindow-linux-x64.tar.gz
+          if-no-files-found: error
+
+  windows:
+    name: Build Windows EXE
+    runs-on: windows-2025
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - run: .\Build.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TwitchChatWindow-windows
+          path: TwitchChatWindow.exe
+          if-no-files-found: error

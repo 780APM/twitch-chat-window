@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -9,7 +8,7 @@ using System.Windows.Forms;
 [assembly: AssemblyTitle("Twitch Chat Window")]
 [assembly: AssemblyProduct("Twitch Chat Window")]
 [assembly: AssemblyDescription("An always-on-top Twitch chat overlay for Windows")]
-[assembly: AssemblyVersion("1.0.0.0")]
+[assembly: AssemblyVersion("1.1.0.0")]
 
 namespace TwitchChatWindow
 {
@@ -40,7 +39,7 @@ namespace TwitchChatWindow
         private readonly Font nameFont;
         private readonly ToolTip tips = new ToolTip();
         private readonly Timer refresh = new Timer { Interval = 100 };
-        private readonly List<ChatMessage> history = new List<ChatMessage>();
+        private readonly ChatHistory history = new ChatHistory();
         private TwitchChat chat;
         private ChatStatus lastStatus;
         private bool hotkeyRegistered;
@@ -257,42 +256,9 @@ namespace TwitchChatWindow
                     refresh.Stop();
                 return;
             }
-            int firstNew = history.Count;
-            bool redraw = false;
-            foreach (IrcLine line in lines)
-            {
-                switch (line.Command)
-                {
-                    case "PRIVMSG":
-                        history.Add(new ChatMessage(line));
-                        break;
-                    case "CLEARMSG":
-                        string id = line.Tag("target-msg-id");
-                        if (id.Length > 0)
-                            redraw |= history.RemoveAll(message => message.Id == id) > 0;
-                        break;
-                    case "CLEARCHAT":
-                        if (String.IsNullOrEmpty(line.Trailing))
-                        {
-                            history.Clear();
-                            redraw = true;
-                        }
-                        else
-                            redraw |= history.RemoveAll(message => String.Equals(message.Login, line.Trailing,
-                                StringComparison.OrdinalIgnoreCase)) > 0;
-                        break;
-                }
-            }
-            if (history.Count > 240)
-            {
-                history.RemoveRange(0, history.Count - 200);
-                redraw = true;
-            }
-            if (redraw)
-            {
+            int firstNew = history.Apply(lines);
+            if (firstNew == 0)
                 feed.Clear();
-                firstNew = 0;
-            }
             for (int index = firstNew; index < history.Count; index++)
             {
                 ChatMessage message = history[index];
