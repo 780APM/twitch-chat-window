@@ -9,6 +9,7 @@ internal static class Program
 
     private static int Main()
     {
+        DesktopIntegration.InstallAppImageLauncher();
         if (String.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY")))
         {
             Console.Error.WriteLine("Twitch Chat Window needs X11 or XWayland. On KDE Wayland, install xorg-xwayland and sign in again.");

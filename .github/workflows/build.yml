@@ -11,130 +11,50 @@ permissions:
 
 jobs:
   linux:
-    name: Build and check single Linux window
-    runs-on: ubuntu-24.04
-    timeout-minutes: 12
+    name: Build and test Linux AppImage
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
-          dotnet-quality: ga
       - name: Check release version
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           version=$(sed -n 's/.*<Version>\(.*\)<\/Version>.*/\1/p' linux/TwitchChatWindow.Linux.csproj)
-          package_version=$(sed -n 's/^pkgver=//p' linux/arch/PKGBUILD)
           test "$GITHUB_REF_NAME" = "v$version"
-          test "$package_version" = "$version"
-      - name: Build and package portable Linux download
-        run: ./linux/build.sh
-      - name: Build and test the pacman package on Arch Linux with KWin
+      - name: Install AppImage build dependencies
         run: |
-          mkdir -p out/pacman-input out/pacman
-          cp linux/arch/PKGBUILD linux/arch/*.desktop linux/smoke-linux.sh linux/check-window.py branding/mark.png \
-            out/TwitchChatWindow-linux-x64.tar.gz out/pacman-input/
-          cp -r linux/tests out/pacman-input/
-          docker run --rm --init -v "$PWD/out/pacman-input:/input:ro" -v "$PWD/out/pacman:/output" \
-            archlinux:base-devel bash -euc '
-              pacman -Syu --noconfirm --needed desktop-file-utils kwin kglobalacceld ttf-dejavu python wayland xorg-xwayland
-              useradd --create-home overlay-test
-              runuser -u overlay-test -- bash -euc "cd /home/overlay-test
-                cp -r /input/* .
-                makepkg --geninteg >> PKGBUILD
-                makepkg --nodeps --noconfirm
-              "
-              package=(/home/overlay-test/twitch-chat-window-*.pkg.tar.zst)
-              pacman -U --noconfirm -- "${package[0]}"
-              desktop-file-validate /usr/share/applications/io.github._780APM.TwitchChatWindow.desktop
-              test -s /usr/share/icons/hicolor/512x512/apps/twitch-chat-window.png
-              # Copy the compositor without its host scheduling capability for the virtual output.
-              cp /usr/bin/kwin_wayland /tmp/kwin_wayland
-              runuser -u overlay-test -- dbus-run-session -- bash /input/smoke-linux.sh /usr/bin/twitch-chat-window /tmp/kwin_wayland
-              install -m644 -- "${package[0]}" /output/
-              cd /output
-              repo-add twitch-chat-window.db.tar.gz twitch-chat-window-*.pkg.tar.zst
-            '
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev librsvg2-dev libgirepository1.0-dev gobject-introspection libicu-dev libssl-dev patchelf squashfs-tools desktop-file-utils
+      - name: Build AppImage with bundled GTK and .NET
+        run: ./linux/build-appimage.sh
+      - name: Test bundled globalization and secure network dependencies
+        run: |
+          dotnet publish linux/tests/chat/ChatSmoke.csproj -c Release -r linux-x64 --self-contained -o out/chat-smoke
+          ./linux/check-appimage-network.sh out/TwitchChatWindow-x86_64.AppImage out/chat-smoke
+      - name: Test AppImage on Arch KDE Wayland
+        run: |
+          mkdir -p out/appimage-test
+          cp out/TwitchChatWindow-x86_64.AppImage linux/smoke-linux.sh linux/check-window.py out/appimage-test/
+          cp -r linux/tests out/appimage-test/
+          docker run --rm --init -v "$PWD/out/appimage-test:/input:ro" archlinux:base-devel bash -euc '
+            pacman -Syu --noconfirm --needed kwin kglobalacceld gtk3 desktop-file-utils ttf-dejavu python wayland xorg-xwayland
+            useradd --create-home overlay-test
+            cp /usr/bin/kwin_wayland /tmp/kwin_wayland
+            runuser -u overlay-test -- bash -euc "cd /home/overlay-test
+              cp /input/TwitchChatWindow-x86_64.AppImage .
+              chmod +x TwitchChatWindow-x86_64.AppImage
+              APPIMAGE_EXTRACT_AND_RUN=1 dbus-run-session -- bash /input/smoke-linux.sh \
+                /home/overlay-test/TwitchChatWindow-x86_64.AppImage /tmp/kwin_wayland
+            "
+          '
       - uses: actions/upload-artifact@v4
         with:
-          name: TwitchChatWindow-linux-x64
-          path: out/TwitchChatWindow-linux-x64.tar.gz
+          name: TwitchChatWindow-AppImage
+          path: out/TwitchChatWindow-x86_64.AppImage
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
-        with:
-          name: TwitchChatWindow-pacman
-          path: |
-            out/pacman/twitch-chat-window-*.pkg.tar.zst
-            out/pacman/twitch-chat-window.db.tar.gz
-            out/pacman/twitch-chat-window.files.tar.gz
-          if-no-files-found: error
-
-  release:
-    name: Publish tested downloads
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [linux, windows]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-          merge-multiple: true
-      - name: Prepare release files and checksums
-        run: |
-          mkdir release
-          cp artifacts/TwitchChatWindow-linux-x64.tar.gz artifacts/TwitchChatWindow.exe \
-            artifacts/twitch-chat-window-*.pkg.tar.zst release/
-          cp linux/install-cachyos.sh release/
-      - name: Sign native package and pacman repository
-        env:
-          PACMAN_SIGNING_KEY: ${{ secrets.PACMAN_SIGNING_KEY }}
-          PACMAN_SIGNING_PASSPHRASE: ${{ secrets.PACMAN_SIGNING_PASSPHRASE }}
-          PACMAN_SIGNING_FINGERPRINT: CDD0942F17CAD1625B4E67F89711FF2636622D60
-        run: |
-          test -n "$PACMAN_SIGNING_KEY"
-          test -n "$PACMAN_SIGNING_PASSPHRASE"
-          keydir=$(mktemp -d "$RUNNER_TEMP/pacman-key.XXXXXX")
-          trap 'rm -rf -- "$keydir"' EXIT
-          chmod 700 "$keydir"
-          printf '%s\n' "$PACMAN_SIGNING_KEY" > "$keydir/private.asc"
-          printf '%s\n' "$PACMAN_SIGNING_PASSPHRASE" > "$keydir/passphrase"
-          chmod 600 "$keydir/"*
-          mkdir signed
-          docker run --rm -e PACMAN_SIGNING_FINGERPRINT -v "$PWD:/source:ro" \
-            -v "$keydir:/keys:ro" -v "$PWD/signed:/output" archlinux:base-devel bash -euc '
-              pacman -Syu --noconfirm --needed gnupg
-              export GNUPGHOME=$(mktemp -d)
-              chmod 700 "$GNUPGHOME"
-              gpg --batch --import /keys/private.asc
-              export PACMAN_SIGNING_PASSPHRASE_FILE=/keys/passphrase
-              package=(/source/artifacts/twitch-chat-window-*.pkg.tar.zst)
-              test "${#package[@]}" -eq 1
-              bash /source/linux/sign-repository.sh "${package[0]}" /output
-            '
-          cp -L signed/twitch-chat-window.{db,db.sig,files,files.sig,asc} release/
-          cp signed/twitch-chat-window-*.pkg.tar.zst.sig release/
-          cd release
-          sha256sum * > SHA256SUMS
-      - name: Publish GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
-        run: |
-          gh release create "$RELEASE_TAG" release/* --verify-tag --latest \
-            --title "Twitch Chat Window $RELEASE_TAG" --notes-file linux/RELEASE-NOTES.md
-
-  verify-repository:
-    name: Verify public pacman installation
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: release
-    uses: ./.github/workflows/verify-pacman.yml
-    with:
-      fingerprint: CDD0942F17CAD1625B4E67F89711FF2636622D60
-      expected_tag: ${{ github.ref_name }}
 
   windows:
     name: Build Windows EXE
@@ -148,3 +68,29 @@ jobs:
           name: TwitchChatWindow-windows
           path: TwitchChatWindow.exe
           if-no-files-found: error
+
+  release:
+    name: Publish Windows and Linux downloads
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [linux, windows]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - name: Publish the two application downloads
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          cp linux/RELEASE-NOTES.md /tmp/release-notes.md
+          printf '\n<details><summary>Download checksums (SHA-256)</summary>\n\n```text\n' >> /tmp/release-notes.md
+          (cd release && sha256sum *) >> /tmp/release-notes.md
+          printf '```\n</details>\n' >> /tmp/release-notes.md
+          gh release create "$RELEASE_TAG" release/* --verify-tag --latest \
+            --title "Twitch Chat Window $RELEASE_TAG" --notes-file /tmp/release-notes.md

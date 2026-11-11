@@ -2,4 +2,6 @@
 /linux/bin/
 /linux/obj/
 /linux/__pycache__/
+/linux/tests/**/bin/
+/linux/tests/**/obj/
 /out/

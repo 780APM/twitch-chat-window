@@ -4,6 +4,7 @@ import ctypes as c
 import os
 import subprocess
 import time
+from pathlib import Path
 
 x = c.CDLL('libX11.so.6')
 shape = c.CDLL('libXext.so.6')
@@ -104,6 +105,17 @@ with open(os.path.join(os.environ['SMOKE_RUNTIME'], 'overlay.log'), 'w') as log:
     try:
         wait_for(lambda: len(windows()) == 1, 'one application window')
         window = windows()[0]
+        if os.environ['SMOKE_EXECUTABLE'].endswith('.AppImage'):
+            data = Path(os.environ['XDG_DATA_HOME'])
+            saved_image = data / 'twitch-chat-window/TwitchChatWindow.AppImage'
+            launcher = data / 'applications/io.github._780APM.TwitchChatWindow.desktop'
+            assert saved_image.is_file() and os.access(saved_image, os.X_OK), 'AppImage was not integrated'
+            assert str(saved_image) in launcher.read_text(), 'Launcher does not use the saved AppImage'
+            subprocess.run(['desktop-file-validate', str(launcher)], check=True, timeout=10)
+            pid = prop(window, '_NET_WM_PID')[0]
+            maps = Path(f'/proc/{pid}/maps').read_text()
+            gtk = [line for line in maps.splitlines() if 'libgtk-3.so' in line]
+            assert gtk and all('appimage_extracted_' in line or '/.mount_' in line for line in gtk), 'GTK came from the host instead of the AppImage'
         wait_for(lambda: atom('_NET_WM_STATE_ABOVE') in prop(window, '_NET_WM_STATE'), 'always on top')
         assert atom('_NET_WM_STATE_SKIP_TASKBAR') not in prop(window, '_NET_WM_STATE')
         assert atom('_NET_WM_WINDOW_TYPE_NORMAL') in prop(window, '_NET_WM_WINDOW_TYPE')

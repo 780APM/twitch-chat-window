@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+APPDIR=${APPDIR:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)}
+export APPDIR
+source "$APPDIR/usr/share/twitch-chat-window/environment.sh"
+export PATH="$APPDIR/usr/bin:$PATH"
+export XDG_DATA_DIRS="${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+for hook in "$APPDIR"/apprun-hooks/*.sh; do
+    [[ ! -f "$hook" ]] || source "$hook"
+done
+# Host GTK/GIO modules can be ABI-incompatible with the bundled libraries.
+export GTK_MODULES= GTK3_MODULES= GIO_EXTRA_MODULES=
+export GIO_MODULE_DIR="$APPDIR/usr/lib/gio/modules"
+export GTK_IM_MODULE=gtk-im-context-simple
+exec "$APPDIR/usr/lib/twitch-chat-window/twitch-chat-window" "$@"
