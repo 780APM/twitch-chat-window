@@ -37,7 +37,7 @@ The Linux build targets 64-bit KDE Plasma and uses XWayland in a Wayland session
 
 The old `twitch-chat-window-packages` repository remains unchanged. Its original signing private key was lost, so the current repository is hosted with the application’s releases and has the new fingerprint above. If you added an old `[twitch-chat-window]` section to `/etc/pacman.conf`, remove only that section before running the new setup script. If an older `/etc/pacman.d/twitch-chat-window.conf` exists, back it up and remove its include before the new setup.
 
-If an old user-local installation overrides the system launcher, remove only its `~/.local/share/applications/io.github._780APM.TwitchChatWindow.desktop` file after the pacman installation succeeds. The system package supplies the current launcher.
+After a successful installation, the setup script backs up the user-local launcher supplied by an earlier portable installation, when it recognizes that exact application path. This lets the system package's current launcher appear in the app menu. Other custom launchers are left alone.
 
 ## Windows
 

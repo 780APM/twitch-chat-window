@@ -55,4 +55,17 @@ if ! grep -Eq '^[[:space:]]*Include[[:space:]]*=[[:space:]]*/etc/pacman.d/twitch
     printf '\nInclude = %s\n' "$repository" | "${privilege[@]}" tee -a /etc/pacman.conf >/dev/null
 fi
 "${privilege[@]}" pacman -Syu "${pacman_options[@]}" twitch-chat-window
+# Migrate the user-local launcher supplied before pacman installation existed.
+# Keep a backup and leave the old runtime intact; the system desktop entry then
+# launches the current package rather than silently opening the older copy.
+desktop="${XDG_DATA_HOME:-$HOME/.local/share}/applications/io.github._780APM.TwitchChatWindow.desktop"
+portable="$HOME/.local/share/twitch-chat-window"
+if (( EUID != 0 )) && [[ -f "$desktop" ]] &&
+   grep -Fxq "Exec=$portable/twitch-chat-window" "$desktop" &&
+   grep -Fxq "TryExec=$portable/twitch-chat-window" "$desktop" &&
+   grep -Fxq "Icon=$portable/mark.png" "$desktop"; then
+    backup=$(mktemp "${desktop}.before-pacman.XXXXXX")
+    mv -- "$desktop" "$backup"
+    printf 'Backed up the older local launcher to %s. The app menu now uses the pacman package.\n' "$backup"
+fi
 printf '\nOpen Twitch Chat Window from your application menu. Ctrl+Shift+F10 unlocks the overlay.\n'
