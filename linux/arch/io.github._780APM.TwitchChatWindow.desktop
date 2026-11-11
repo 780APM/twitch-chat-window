@@ -6,4 +6,5 @@ Exec=twitch-chat-window
 TryExec=twitch-chat-window
 Icon=twitch-chat-window
 Terminal=false
+StartupNotify=true
 Categories=Utility;

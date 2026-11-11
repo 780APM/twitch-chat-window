@@ -28,6 +28,9 @@ internal sealed class Overlay : ApplicationWindow
     private uint refreshTimer;
     private bool clickThrough;
 
+    public bool IsClickThrough => clickThrough;
+    public event EventHandler ClickThroughChanged;
+
     public Overlay(Application app) : base(app)
     {
         Title = "Twitch Chat Window";
@@ -156,6 +159,7 @@ internal sealed class Overlay : ApplicationWindow
         controls.Visible = !enabled;
         close.Visible = !enabled;
         lockedHint.Visible = enabled;
+        ClickThroughChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void ConnectChannel()

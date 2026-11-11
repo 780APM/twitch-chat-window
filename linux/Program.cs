@@ -16,17 +16,36 @@ internal static class Program
             return 1;
         }
 
+        if (!LayerShell.IsInstalled())
+        {
+            Console.Error.WriteLine("Twitch Chat Window needs GTK 3 and gtk-layer-shell. On CachyOS/Arch, run: sudo pacman -S --needed gtk-layer-shell");
+            return 1;
+        }
+
+        // GDK uses the program name for the Wayland app ID. Match the desktop file
+        // so Plasma groups the control window under the installed application's icon.
+        GLib.Global.ProgramName = AppId;
+        GLib.Global.ApplicationName = "Twitch Chat Window";
         LayerShell.UseWaylandOnly();
         using var app = new Application(AppId, GLib.ApplicationFlags.None);
         using var toggle = new GLib.SimpleAction("toggle-click-through", null);
+        using var minimize = new GLib.SimpleAction("minimize-controls", null);
+        using var quit = new GLib.SimpleAction("quit", null);
         Overlay overlay = null;
+        ControlWindow controls = null;
         toggle.Activated += (_, _) => overlay?.ToggleClickThrough();
+        minimize.Activated += (_, _) => controls?.Iconify();
+        quit.Activated += (_, _) => controls?.Destroy();
         app.AddAction(toggle);
+        app.AddAction(minimize);
+        app.AddAction(quit);
         app.Activated += (_, _) =>
         {
             if (overlay != null)
             {
                 overlay.Unlock();
+                controls.Deiconify();
+                controls.Present();
                 return;
             }
 
@@ -40,8 +59,19 @@ internal static class Program
             }
 
             overlay = new Overlay(app);
-            overlay.Destroyed += (_, _) => overlay = null;
+            controls = new ControlWindow(app, overlay);
+            overlay.Destroyed += (_, _) =>
+            {
+                overlay = null;
+                controls?.Destroy();
+            };
+            controls.Destroyed += (_, _) =>
+            {
+                controls = null;
+                overlay?.Destroy();
+            };
             overlay.ShowAll();
+            controls.ShowAll();
         };
         return ((GLib.Application)app).Run();
     }
@@ -53,6 +83,14 @@ internal static class LayerShell
     private enum Layer { Background, Bottom, Top, Overlay }
     private enum Edge { Left, Right, Top, Bottom }
     private enum Keyboard { None, Exclusive, OnDemand }
+
+    public static bool IsInstalled()
+    {
+        if (!NativeLibrary.TryLoad(Library, out var handle))
+            return false;
+        NativeLibrary.Free(handle);
+        return true;
+    }
 
     public static void UseWaylandOnly() => gdk_set_allowed_backends("wayland");
     public static bool IsSupported() => gtk_layer_is_supported() != 0;

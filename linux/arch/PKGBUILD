@@ -1,5 +1,5 @@
 pkgname=twitch-chat-window
-pkgver=1.1.0
+pkgver=1.2.0
 pkgrel=1
 pkgdesc='Always-on-top Twitch chat overlay for KDE Plasma Wayland'
 arch=('x86_64')

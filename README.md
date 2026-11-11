@@ -6,7 +6,15 @@ A small, always-on-top overlay that reads live public Twitch chat using only the
 
 ## CachyOS with KDE Plasma Wayland
 
-Add the [signed pacman repository](https://github.com/780APM/twitch-chat-window-packages#install-on-cachyos) once. Install the overlay and its dependencies with `sudo pacman -Syu twitch-chat-window`, then open **Twitch Chat Window** from the app menu.
+Download the native `twitch-chat-window-1.2.0-1-x86_64.pkg.tar.zst` package from the [latest GitHub release](https://github.com/780APM/twitch-chat-window/releases/latest). From the download folder, install it and its dependencies with:
+
+```sh
+sudo pacman -U ./twitch-chat-window-1.2.0-1-x86_64.pkg.tar.zst
+```
+
+Open **Twitch Chat Window** from the app menu. The app has a normal control window in the taskbar and a separate chat overlay. Minimize the control window while you play; the overlay stays visible. Restore it from the taskbar to unlock the overlay or change click-through mode. Closing either window quits the app.
+
+The separately maintained [signed pacman repository](https://github.com/780APM/twitch-chat-window-packages#install-on-cachyos) supports installation by package name with `sudo pacman -Syu twitch-chat-window`. Its releases may lag the direct downloads above.
 
 Enter a Twitch username. Use **Opacity** and **Position** to adjust the overlay before starting your game.
 
@@ -31,6 +39,14 @@ The EXE runs on Windows 10 or 11 with .NET Framework 4.8 or later. It uses Twitc
 
 On Windows, run `powershell -ExecutionPolicy Bypass -File .\Build.ps1` in the project folder. The script uses the compiler included in Windows .NET Framework and creates `TwitchChatWindow.exe` in the same folder.
 
-On Linux, use the .NET 10 SDK and run `dotnet publish linux/TwitchChatWindow.Linux.csproj -c Release -r linux-x64 --self-contained -o out/linux`. Launch `out/linux/twitch-chat-window`.
+On Linux, install the .NET 10 SDK and `gtk-layer-shell`, then run `./linux/build.sh`. Launch `out/TwitchChatWindow/twitch-chat-window`. The script also creates `out/TwitchChatWindow-linux-x64.tar.gz`, including the runtime and third-party notices. If the SDK is installed outside your PATH, set `DOTNET=/path/to/dotnet` when running the script.
+
+On CachyOS/Arch, install `base-devel` and run `./linux/build.sh --pacman` to also create a native package in `out/pacman/`. Install it with `sudo pacman -U out/pacman/twitch-chat-window-*.pkg.tar.zst`. This installs the desktop entry, icon and application files; pacman resolves the runtime dependencies. Building the package itself does not require those runtime dependencies to be installed.
 
 The [brand assets](branding/README.md) include the logo, wordmark, and Windows icon.
+
+## Publishing downloads
+
+Update the version in `linux/TwitchChatWindow.Linux.csproj` and `linux/arch/PKGBUILD`, then update `linux/RELEASE-NOTES.md`. Push a matching version tag such as `v1.2.0`. GitHub Actions builds Windows and Linux, tests the installed native package under KWin, and publishes the portable archive, native CachyOS package, Windows executable and SHA-256 checksums as a GitHub release after both builds pass.
+
+Direct-download packages do not update the separate signed pacman repository automatically. Publishing there requires its original package-signing private key; do not replace that key or weaken signature verification to publish an update.

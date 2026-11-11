@@ -3,6 +3,7 @@ name: Build desktop downloads
 on:
   push:
     branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
@@ -19,23 +20,20 @@ jobs:
         with:
           dotnet-version: 10.0.x
           dotnet-quality: ga
-      - name: Build Linux x64
-        run: dotnet publish linux/TwitchChatWindow.Linux.csproj -c Release -r linux-x64 --self-contained -p:DebugType=None -o out/TwitchChatWindow
-      - name: Package portable Linux download
+      - name: Check release version
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
-          cp README.md out/TwitchChatWindow/README.md
-          notices=out/TwitchChatWindow/licenses
-          mkdir "$notices"
-          cp "$DOTNET_ROOT/LICENSE.txt" "$notices/dotnet-license.txt"
-          cp "$DOTNET_ROOT/ThirdPartyNotices.txt" "$notices/dotnet-third-party-notices.txt"
-          cp /usr/share/common-licenses/LGPL-2 "$notices/gtksharp-license.txt"
-          printf '%s\n' 'GtkSharp 3.24.24.95 source code' 'https://github.com/GtkSharp/GtkSharp' > "$notices/gtksharp-source.txt"
-          tar -C out -czf TwitchChatWindow-linux-x64.tar.gz TwitchChatWindow
+          version=$(sed -n 's/.*<Version>\(.*\)<\/Version>.*/\1/p' linux/TwitchChatWindow.Linux.csproj)
+          package_version=$(sed -n 's/^pkgver=//p' linux/arch/PKGBUILD)
+          test "$GITHUB_REF_NAME" = "v$version"
+          test "$package_version" = "$version"
+      - name: Build and package portable Linux download
+        run: ./linux/build.sh
       - name: Build and test the pacman package on Arch Linux with KWin
         run: |
           mkdir -p out/pacman-input out/pacman
           cp linux/arch/PKGBUILD linux/arch/*.desktop linux/smoke-wayland.sh branding/mark.png \
-            TwitchChatWindow-linux-x64.tar.gz out/pacman-input/
+            out/TwitchChatWindow-linux-x64.tar.gz out/pacman-input/
           docker run --rm --init -v "$PWD/out/pacman-input:/input:ro" -v "$PWD/out/pacman:/output" \
             archlinux:base-devel bash -euc '
               pacman -Syu --noconfirm --needed desktop-file-utils kwin ttf-dejavu
@@ -59,7 +57,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: TwitchChatWindow-linux-x64
-          path: TwitchChatWindow-linux-x64.tar.gz
+          path: out/TwitchChatWindow-linux-x64.tar.gz
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         with:
@@ -69,6 +67,35 @@ jobs:
             out/pacman/twitch-chat-window.db.tar.gz
             out/pacman/twitch-chat-window.files.tar.gz
           if-no-files-found: error
+
+  release:
+    name: Publish tested downloads
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [linux, windows]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Prepare release files and checksums
+        run: |
+          mkdir release
+          cp artifacts/TwitchChatWindow-linux-x64.tar.gz artifacts/TwitchChatWindow.exe \
+            artifacts/twitch-chat-window-*.pkg.tar.zst release/
+          cd release
+          sha256sum * > SHA256SUMS
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" release/* --verify-tag --latest \
+            --title "Twitch Chat Window $RELEASE_TAG" --notes-file linux/RELEASE-NOTES.md
 
   windows:
     name: Build Windows EXE
