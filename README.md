@@ -13,7 +13,7 @@ Open the **[latest release](https://github.com/780APM/twitch-chat-window/release
 
 GitHub also generates source-code archives automatically. You do not need those to use the app.
 
-## Linux — KDE Plasma
+## Linux — KDE Plasma 6+
 
 1. Download **TwitchChatWindow-x86_64.AppImage**.
 2. Right-click it, open **Properties → Permissions**, and allow it to run as an executable.
@@ -21,9 +21,11 @@ GitHub also generates source-code archives automatically. You do not need those 
 4. Enter a Twitch username and connect. Drag the title to place the window anywhere, including across monitors. Drag the bottom-right grip to resize it.
 5. Choose **Click through** before returning to your game. Press **Ctrl+Shift+F10** to unlock the running overlay without restarting it or taking focus from your game.
 
-The Linux AppImage includes .NET, GTK 3 and their supporting libraries. It targets x86-64 Linux desktops with glibc 2.35 or newer, including Ubuntu 22.04+ and current Arch/CachyOS. KDE Plasma provides the global unlock shortcut; a Wayland session also needs XWayland, which is normally already present on Plasma. The app can run in X11 sessions too. If a shortcut is already assigned elsewhere, change **Unlock overlay** under **Twitch Chat Window** in Plasma’s keyboard shortcut settings, or unlock through the taskbar.
+The Linux AppImage includes .NET, GTK 3 and their supporting libraries. It requires **KDE Plasma 6 or newer** on x86-64 Linux with glibc 2.35 or newer, including current Arch/CachyOS. A Wayland session also needs XWayland, which is normally already present on Plasma. The app can run in Plasma X11 sessions too. If a shortcut is already assigned elsewhere, change **Unlock overlay** under **Twitch Chat Window** in Plasma’s keyboard shortcut settings, or unlock through the taskbar.
 
-The app has one window and one taskbar entry. **−** minimizes it and **×** quits. If a fullscreen game covers the overlay, use windowed mode.
+The app stays above fullscreen Wayland and X11 games. On first launch it automatically adds a KDE window rule that raises only Twitch Chat Window above fullscreen windows. It keeps one movable window and one taskbar entry. **−** minimizes it and **×** quits.
+
+The rule appears as **Twitch Chat Window above fullscreen games** under **System Settings → Window Management → Window Rules**. Existing rules are preserved, with a backup at `~/.config/kwinrulesrc.before-twitch-chat-window` when a rules file already exists. When uninstalling, you can remove this rule along with the saved AppImage and launcher.
 
 The saved copy is `~/.local/share/twitch-chat-window/TwitchChatWindow.AppImage` (or under `XDG_DATA_HOME` when set). Launching a newer downloaded AppImage replaces that saved copy and updates the launcher. Close an older running version once after upgrading so the next launch loads the new version.
 

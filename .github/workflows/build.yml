@@ -29,7 +29,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev librsvg2-dev libgirepository1.0-dev gobject-introspection libicu-dev libssl-dev patchelf squashfs-tools desktop-file-utils
       - name: Build AppImage with bundled GTK and .NET
-        run: ./linux/build-appimage.sh
+        run: |
+          dotnet run --project linux/tests/rules/RulesSmoke.csproj -c Release
+          ./linux/build-appimage.sh
       - name: Test bundled globalization and secure network dependencies
         run: |
           dotnet publish linux/tests/chat/ChatSmoke.csproj -c Release -r linux-x64 --self-contained -o out/chat-smoke

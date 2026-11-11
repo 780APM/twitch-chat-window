@@ -39,7 +39,9 @@ printf 'APPIMAGE_ICU_MAJOR=%s\n' "$icu_major" > "$appdir/usr/share/twitch-chat-w
 cp "$root/linux/appimage/environment.sh" "$appdir/usr/share/twitch-chat-window/"
 libs=(--library "$(pkg-config --variable=libdir gtk+-3.0)/libgtk-3.so.0")
 for name in icui18n icuuc icudata; do
-    libs+=(--library "$(pkg-config --variable=libdir icu-uc)/lib$name.so")
+    # .NET loads the versioned name dynamically. Deploying the unversioned
+    # development symlink alone omits libicui18n.so.N on other distributions.
+    libs+=(--library "$(pkg-config --variable=libdir icu-uc)/lib$name.so.$icu_major")
 done
 for name in ssl crypto; do
     libs+=(--library "$(pkg-config --variable=libdir openssl)/lib$name.so.3")

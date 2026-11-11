@@ -100,6 +100,40 @@ def action(name):
     subprocess.run(['gapplication', 'action', app_id, name], check=True, timeout=10)
 
 
+def verify_fullscreen_stack(backend):
+    marker = 'TWITCH_FULLSCREEN_ABOVE_' + backend
+    runtime = Path(os.environ['SMOKE_RUNTIME'])
+    script = runtime / ('check-fullscreen-' + backend + '.js')
+    script.write_text("""
+const timer = new QTimer();
+function check() {
+    const windows = workspace.windowList();
+    let chat = null, game = null;
+    for (const window of windows) {
+        if (window.resourceClass.toLowerCase() === 'io.github._780apm.twitchchatwindow') chat = window;
+        if (window.caption === 'Shortcut test game') game = window;
+    }
+    if (chat && game && game.fullScreen && game.active && chat.normalWindow &&
+        !chat.skipTaskbar && chat.layer > game.layer && chat.stackingOrder > game.stackingOrder) {
+        console.warn('""" + marker + """');
+        timer.stop();
+    }
+}
+timer.timeout.connect(check);
+timer.start(50);
+check();
+""")
+    reply = subprocess.check_output(['gdbus', 'call', '--session', '--dest', 'org.kde.KWin',
+        '--object-path', '/Scripting', '--method', 'org.kde.kwin.Scripting.loadScript', str(script)], text=True)
+    script_id = ''.join(character for character in reply if character.isdigit())
+    assert script_id, reply
+    subprocess.run(['gdbus', 'call', '--session', '--dest', 'org.kde.KWin', '--object-path',
+        '/Scripting/Script' + script_id, '--method', 'org.kde.kwin.Script.run'], check=True,
+        stdout=subprocess.DEVNULL, timeout=10)
+    wait_for(lambda: marker in (runtime / 'kwin.log').read_text(),
+             'overlay above active fullscreen ' + backend + ' window')
+
+
 with open(os.path.join(os.environ['SMOKE_RUNTIME'], 'overlay.log'), 'w') as log:
     app = subprocess.Popen([os.environ['SMOKE_EXECUTABLE']], stdout=log, stderr=subprocess.STDOUT)
     try:
@@ -114,8 +148,9 @@ with open(os.path.join(os.environ['SMOKE_RUNTIME'], 'overlay.log'), 'w') as log:
             subprocess.run(['desktop-file-validate', str(launcher)], check=True, timeout=10)
             pid = prop(window, '_NET_WM_PID')[0]
             maps = Path(f'/proc/{pid}/maps').read_text()
-            gtk = [line for line in maps.splitlines() if 'libgtk-3.so' in line]
-            assert gtk and all('appimage_extracted_' in line or '/.mount_' in line for line in gtk), 'GTK came from the host instead of the AppImage'
+            for library in ['libgtk-3.so', 'libicui18n.so.', 'libicuuc.so.', 'libicudata.so.']:
+                loaded = [line for line in maps.splitlines() if library in line]
+                assert loaded and all('appimage_extracted_' in line or '/.mount_' in line for line in loaded), library + ' came from the host instead of the AppImage'
         wait_for(lambda: atom('_NET_WM_STATE_ABOVE') in prop(window, '_NET_WM_STATE'), 'always on top')
         assert atom('_NET_WM_STATE_SKIP_TASKBAR') not in prop(window, '_NET_WM_STATE')
         assert atom('_NET_WM_WINDOW_TYPE_NORMAL') in prop(window, '_NET_WM_WINDOW_TYPE')
@@ -135,25 +170,30 @@ with open(os.path.join(os.environ['SMOKE_RUNTIME'], 'overlay.log'), 'w') as log:
 
         action('toggle-click-through')
         wait_for(lambda: input_rectangles() == 0, 'click-through input region')
-        # Unlock using real compositor-wide key events while a native Wayland
-        # fullscreen client owns focus. Do not restart or activate the chat app.
-        game_env = os.environ.copy()
-        game_env['GDK_BACKEND'] = 'wayland'
-        with open(os.path.join(os.environ['SMOKE_RUNTIME'], 'game.log'), 'w') as game_log:
-            game = subprocess.Popen([os.environ['SMOKE_GAME']], env=game_env,
-                                    stdout=game_log, stderr=subprocess.STDOUT)
-            try:
-                wait_for(lambda: prop(root, '_NET_ACTIVE_WINDOW') != [window], 'native Wayland game focus')
-                subprocess.run([os.environ['SMOKE_POINTER'], 'unlock'], check=True, timeout=10)
-                wait_for(lambda: input_rectangles() > 0, 'Ctrl+Shift+F10 unlock with another app focused')
-                assert app.poll() is None and windows() == [window], 'Shortcut restarted the app'
-                assert prop(root, '_NET_ACTIVE_WINDOW') != [window], 'Unlock stole game focus'
-                subprocess.run([os.environ['SMOKE_POINTER'], 'unlock'], check=True, timeout=10)
-                time.sleep(.1)
-                assert input_rectangles() > 0, 'Pressing unlock again re-locked the window'
-            finally:
-                game.terminate()
-                game.wait(timeout=10)
+        # Verify actual compositor stacking over both fullscreen backends,
+        # then unlock without activating or restarting the overlay.
+        for backend in ('wayland', 'x11'):
+            if input_rectangles() > 0:
+                action('toggle-click-through')
+                wait_for(lambda: input_rectangles() == 0, 'lock before fullscreen test')
+            game_env = os.environ.copy()
+            game_env['GDK_BACKEND'] = backend
+            with open(os.path.join(os.environ['SMOKE_RUNTIME'], 'game-' + backend + '.log'), 'w') as game_log:
+                game = subprocess.Popen([os.environ['SMOKE_GAME']], env=game_env,
+                                        stdout=game_log, stderr=subprocess.STDOUT)
+                try:
+                    wait_for(lambda: prop(root, '_NET_ACTIVE_WINDOW') != [window], backend + ' game focus')
+                    verify_fullscreen_stack(backend)
+                    subprocess.run([os.environ['SMOKE_POINTER'], 'unlock'], check=True, timeout=10)
+                    wait_for(lambda: input_rectangles() > 0, 'Ctrl+Shift+F10 unlock with another app focused')
+                    assert app.poll() is None and windows() == [window], 'Shortcut restarted the app'
+                    assert prop(root, '_NET_ACTIVE_WINDOW') != [window], 'Unlock stole game focus'
+                    subprocess.run([os.environ['SMOKE_POINTER'], 'unlock'], check=True, timeout=10)
+                    time.sleep(.1)
+                    assert input_rectangles() > 0, 'Pressing unlock again re-locked the window'
+                finally:
+                    game.terminate()
+                    game.wait(timeout=10)
         action('toggle-click-through')
         wait_for(lambda: input_rectangles() == 0, 'lock after global shortcut')
         action('minimize')
@@ -173,7 +213,7 @@ with open(os.path.join(os.environ['SMOKE_RUNTIME'], 'overlay.log'), 'w') as log:
         assert windows() == [window], 'Relaunch created another window'
         action('quit')
         assert app.wait(timeout=10) == 0
-        print('Single taskbar window, free movement, click-through, global unlock from native Wayland fullscreen, taskbar restore and quit passed.')
+        print('Single taskbar window, free movement, click-through, stacking above native Wayland and X11 fullscreen, global unlock, taskbar restore and quit passed.')
     finally:
         if app.poll() is None:
             app.terminate()

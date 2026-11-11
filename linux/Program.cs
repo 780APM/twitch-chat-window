@@ -48,6 +48,15 @@ internal static class Program
                 overlay.Present();
                 return;
             }
+            try { FullscreenOverlay.Configure(); }
+            catch (Exception error)
+            {
+                using var dialog = new MessageDialog(null, DialogFlags.Modal, MessageType.Error, ButtonsType.Close,
+                    "Could not enable the fullscreen overlay.\n" + error.Message);
+                dialog.Run();
+                dialog.Destroy();
+                return;
+            }
             overlay = new Overlay(app);
             overlay.Destroyed += (_, _) =>
             {

@@ -6,7 +6,9 @@ Download **TwitchChatWindow.exe** and open it. Requires Windows 10/11 with .NET 
 
 Download **TwitchChatWindow-x86_64.AppImage**, allow it to run as an executable in **Properties → Permissions**, and open it. It includes .NET and GTK, saves a copy for your user account, and adds **Twitch Chat Window** to your application-menu search. No sudo or repository setup is needed.
 
-The AppImage targets x86-64 Linux with glibc 2.35 or newer, including Ubuntu 22.04+ and current CachyOS/Arch. KDE Plasma provides the global unlock shortcut; Wayland sessions also need XWayland.
+Requires **KDE Plasma 6 or newer** on x86-64 Linux with glibc 2.35 or newer, including current CachyOS/Arch. Wayland sessions also need XWayland.
+
+**Fixed: the overlay now stays above fullscreen Wayland and X11 games.** First launch automatically adds a KDE window rule scoped to this app, preserving its normal taskbar entry and free positioning. Existing window rules are preserved and backed up before the change.
 
 ### Controls
 
